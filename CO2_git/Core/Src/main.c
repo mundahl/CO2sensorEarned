@@ -184,19 +184,19 @@ int main(void)
   while (1)
   {
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
-    HAL_Delay(1000);
+    HAL_Delay(500);
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
-	HAL_Delay(1000);
+	HAL_Delay(500);
 	HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
-	HAL_Delay(1000);
+	HAL_Delay(500);
 	HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
-	HAL_Delay(1000);
+	HAL_Delay(500);
 	  /* USER CODE END WHILE */
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
-	HAL_Delay(1000);
+	HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
