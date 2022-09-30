@@ -183,7 +183,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
+    /* Turns out the below block isn't needed, we can just toggle once per loop as I ~knew */
+	/*
+	HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
     HAL_Delay(500);
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
 	HAL_Delay(500);
@@ -191,12 +193,17 @@ int main(void)
 	HAL_Delay(500);
 	HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
 	HAL_Delay(500);
-	  /* USER CODE END WHILE */
+	*/
+
+	/* USER CODE END WHILE */
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
+    __disable_irq();
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
+    __enable_irq();
 	HAL_Delay(500);
+
   }
   /* USER CODE END 3 */
 }
