@@ -149,7 +149,10 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  __disable_irq();
   MX_GPIO_Init();
+  __enable_irq();
+
   MX_ADC3_Init();
   MX_CRC_Init();
   MX_DCMI_Init();
@@ -200,7 +203,14 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     __disable_irq();
+    /*
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
+    */
+
+    uint32_t* GPIO_Port_OI_ODR_Addy = (uint32_t*)0x40022014UL;
+    int Pin_Num_OI = 2;
+    uint32_t Pin_Reg_OI = 1 << Pin_Num_OI;
+    *GPIO_Port_OI_ODR_Addy = ((*GPIO_Port_OI_ODR_Addy) ^ (Pin_Reg_OI));
     __enable_irq();
 	HAL_Delay(500);
 
