@@ -42,6 +42,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
+volatile uint32_t uwTick_copy;
+uint32_t uwTickFreq_copy = 1U;
 
 /* USER CODE END PV */
 
@@ -208,6 +210,7 @@ void SysTick_Handler(void)
 void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
+  uwTick_copy += uwTickFreq_copy;
 
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);

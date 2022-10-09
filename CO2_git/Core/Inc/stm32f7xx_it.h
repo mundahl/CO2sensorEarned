@@ -38,7 +38,8 @@
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
+ extern volatile uint32_t uwTick_copy;
+ extern uint32_t uwTickFreq_copy;
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/

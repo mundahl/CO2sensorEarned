@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_host.h"
+void JHM_Delay(uint32_t Delay_copy);
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -82,6 +83,8 @@ UART_HandleTypeDef huart6;
 SDRAM_HandleTypeDef hsdram1;
 
 /* USER CODE BEGIN PV */
+volatile uint32_t uwTick_copy;
+uint32_t uwTickFreq_copy;
 
 /* USER CODE END PV */
 
@@ -179,6 +182,8 @@ int main(void)
   /* MX_ETH_Init(); */
 
   /* USER CODE BEGIN 2 */
+  /* volatile uint32_t uwTick_copy;
+  uint32_t uwTickFreq_copy = 1U; */
 
   /* USER CODE END 2 */
 
@@ -212,10 +217,25 @@ int main(void)
     uint32_t Pin_Reg_OI = 1 << Pin_Num_OI;
     *GPIO_Port_OI_ODR_Addy = ((*GPIO_Port_OI_ODR_Addy) ^ (Pin_Reg_OI));
     __enable_irq();
-	HAL_Delay(500);
+	HAL_Delay(300);
+	JHM_Delay(700);
 
   }
   /* USER CODE END 3 */
+}
+
+void JHM_Delay(uint32_t Delay_copy)
+{
+	uint32_t tickstart_copy = uwTick_copy;
+	uint32_t wait_copy = Delay_copy;
+	if (wait_copy < 0xFFFFFFFFU)
+	{
+		wait_copy += (uint32_t)(uwTickFreq_copy);
+	}
+	while ((uwTick_copy - tickstart_copy) < wait_copy)
+	{
+		/* Spending a lot of time doing nothing in this loop */
+	}
 }
 
 /**
