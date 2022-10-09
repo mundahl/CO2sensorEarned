@@ -217,7 +217,7 @@ int main(void)
     uint32_t Pin_Reg_OI = 1 << Pin_Num_OI;
     *GPIO_Port_OI_ODR_Addy = ((*GPIO_Port_OI_ODR_Addy) ^ (Pin_Reg_OI));
     __enable_irq();
-	HAL_Delay(300);
+	/*HAL_Delay(300);*/
 	JHM_Delay(700);
 
   }
