@@ -59,8 +59,8 @@ uint32_t uwTickFreq_copy = 1U;
 
 /* External variables --------------------------------------------------------*/
 extern HCD_HandleTypeDef hhcd_USB_OTG_FS;
-extern DMA2D_HandleTypeDef hdma2d;
-extern LTDC_HandleTypeDef hltdc;
+//extern DMA2D_HandleTypeDef hdma2d; // JHM commented out (not in main.c, so adding this comment for easier discovery
+//extern LTDC_HandleTypeDef hltdc; // JHM commented out (not in main.c, so adding this comment for easier discovery
 extern TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN EV */
@@ -241,7 +241,7 @@ void LTDC_IRQHandler(void)
   /* USER CODE BEGIN LTDC_IRQn 0 */
 
   /* USER CODE END LTDC_IRQn 0 */
-  HAL_LTDC_IRQHandler(&hltdc);
+//  HAL_LTDC_IRQHandler(&hltdc); // JHM commented out (not in main.c, so adding this comment for easier discovery
   /* USER CODE BEGIN LTDC_IRQn 1 */
 
   /* USER CODE END LTDC_IRQn 1 */
@@ -255,7 +255,7 @@ void DMA2D_IRQHandler(void)
   /* USER CODE BEGIN DMA2D_IRQn 0 */
 
   /* USER CODE END DMA2D_IRQn 0 */
-  HAL_DMA2D_IRQHandler(&hdma2d);
+//  HAL_DMA2D_IRQHandler(&hdma2d); // JHM commented out (not in main.c, so adding this comment for easier discovery
   /* USER CODE BEGIN DMA2D_IRQn 1 */
 
   /* USER CODE END DMA2D_IRQn 1 */

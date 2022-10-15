@@ -5,6 +5,15 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+EW DATE :: 2022.10.14 ----------
+  Summary: Finished deconstructing HAL_GPIO_Init(). Wrote code to replace HAL with distilled register manipulation. Ran code, didn't work. I debugged until I found I forgot to type in a line I had written down.. (Gotta love __disable_irq() and __enable_irq() for helping me debug most things!) Now it works flawlessly! Oh I did decide to omit SystemClock_Config() calls for now even though it seems to be creating some dilation (2x my delay) and instability (eventually the toggling stops). Next up, replace HAL_Init() and then come back to SystemClock_Config() before moving onto U(s)ART with my CO2 sensor !
+
+NEW DATE :: 2022.10.13 ----------
+  Summary: In my quest to control registers more granularly by boiling down HAL code into bit manipulation, I worked deconstructed MX_GPIO_Init() into __HAL_RCC_GPIOI_CLK_ENABLE() and HAL_GPIO_Init(). I distilled down __HAL_RCC...() into register manipulation. I started deconstructing HAL_GPIO_Init() too. 
+
+EW DATE :: 2022.10.11 ----------
+  Summary: In my quest to control registers more granularly by boiling down HAL code into bit manipulation, I worked determine the microcontroller busses and HAL calls that were still needed. Results: MX_GPIO_Init() and HAL_Init().
+
 NEW DATE :: 2022.10.09 ----------
   Summary: OH BOY! I took all of my HAL_Delay learnings and summarized all of the places where HAL_Delay() calls a HAL (sub)function. There are a lot. I devised a plan to copy this structure, but simplify and package it into my own code that doesn't use a single HAL. I had to debug around my implementation of the global variable that tracks time (and frequency). But IT's ALIVE! The code updated in this commit will toggle, then delay 300ms for the HAL_Delay() and then immediately delay 700ms for my JHM_Delay(). Sweet sweet feeling of bringing a vision to life. I can't wait to keep expanding that vision (into real life). // This HAL_Delay() replacement, which is no longer called now, is less like going from 1 to 2 and more like 1 to 3 or 1 to 10. Now the delay is just the 700 ms from my own implementation. 
 
