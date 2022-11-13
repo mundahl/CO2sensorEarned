@@ -161,68 +161,82 @@ int main(void)
 
 //	#include "stm32f7xx_hal.h"
 //	#include "stm32f7xx_hal_tim.h"
-  	TIM_HandleTypeDef        htim6_OI; // JHM added 2022.11.12 in debug
-  	// htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 1, AutoReloadPreload = 48}, Channel = (HAL_TIM_ACTIVE_CHANNEL_3 | HAL_TIM_ACTIVE_CHANNEL_6), hdma = {0x0, 0x8000359 <main+336>, 0x80003ba <main+434>, 0x21000000, 0xf0, 0xfa, 0x1}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_BUSY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY}
-  	htim6_OI.Init.RepetitionCounter = 0;
-  	htim6_OI.Init.AutoReloadPreload = 0;
-  	htim6_OI.Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
-  	htim6_OI.hdma[0] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[1] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[2] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[3] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[4] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[5] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.hdma[6] = (DMA_HandleTypeDef *) 0x0;
-  	htim6_OI.State = HAL_TIM_STATE_RESET;
-  	htim6_OI.ChannelState[0] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelState[1] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelState[2] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelState[3] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelState[4] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelState[5] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelNState[0] = HAL_TIM_CHANNEL_STATE_RESET;
-  	htim6_OI.ChannelNState[1] = HAL_TIM_CHANNEL_STATE_RESET;
-    htim6_OI.ChannelNState[2] = HAL_TIM_CHANNEL_STATE_RESET;
-    htim6_OI.ChannelNState[3] = HAL_TIM_CHANNEL_STATE_RESET;
-    htim6_OI.DMABurstState = HAL_DMA_BURST_STATE_RESET;
+//  	TIM_HandleTypeDef        htim6_OI; // JHM added 2022.11.12 in debug
+//  	// htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 1, AutoReloadPreload = 48}, Channel = (HAL_TIM_ACTIVE_CHANNEL_3 | HAL_TIM_ACTIVE_CHANNEL_6), hdma = {0x0, 0x8000359 <main+336>, 0x80003ba <main+434>, 0x21000000, 0xf0, 0xfa, 0x1}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_BUSY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY}
+//  	htim6_OI.Init.RepetitionCounter = 0;
+//  	htim6_OI.Init.AutoReloadPreload = 0;
+//  	htim6_OI.Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
+//  	htim6_OI.hdma[0] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[1] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[2] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[3] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[4] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[5] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.hdma[6] = (DMA_HandleTypeDef *) 0x0;
+//  	htim6_OI.State = HAL_TIM_STATE_RESET;
+//  	htim6_OI.ChannelState[0] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelState[1] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelState[2] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelState[3] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelState[4] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelState[5] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelNState[0] = HAL_TIM_CHANNEL_STATE_RESET;
+//  	htim6_OI.ChannelNState[1] = HAL_TIM_CHANNEL_STATE_RESET;
+//    htim6_OI.ChannelNState[2] = HAL_TIM_CHANNEL_STATE_RESET;
+//    htim6_OI.ChannelNState[3] = HAL_TIM_CHANNEL_STATE_RESET;
+//    htim6_OI.DMABurstState = HAL_DMA_BURST_STATE_RESET;
 
 
-    RCC_ClkInitTypeDef    clkconfig;
+//    RCC_ClkInitTypeDef    clkconfig;
 	uint32_t              uwTimclock = 0;
-	uint32_t              uwPrescalerValue = 0;
-	uint32_t              pFLatency;
+//	uint32_t              uwPrescalerValue = 0;
+//	uint32_t              pFLatency;
 	/*Configure the TIM6 IRQ priority */
-	HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TICK_INT_PRIORITY ,0);
+//	HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TICK_INT_PRIORITY ,0); // 2022.11.13, weird I thought I'd need this one, but priority must be "good enough"
 
-	/* Enable the TIM6 global Interrupt */
-	HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+//	/* Enable the TIM6 global Interrupt */
+//	HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
 
-	/* Enable TIM6 clock */
-	__HAL_RCC_TIM6_CLK_ENABLE();
+	//BLOCK1 HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+	//NIVC -> ISER Setting
+	uint32_t* NVIC_ISER_OI = (uint32_t*)0xE000E104UL; // Empirically 0xe000e104 (same)
+	*NVIC_ISER_OI = (uint32_t)(1U << 22U); // Empirically 0x400000 (same)
+
+//	/* Enable TIM6 clock */
+//	__HAL_RCC_TIM6_CLK_ENABLE();
+
+	//BLOCK1 __HAL_RCC_TIM6_CLK_ENABLE();
+	//RCC -> APB1ENR for TIM6EN
+	uint32_t* RCC_APB1ENR_OI = (uint32_t *)0x40023840UL; // Empirically 0x40023840 (same)
+	*RCC_APB1ENR_OI |= (uint32_t)(1U << 4U); // Empirically 16 (same)
 
 	/* Get clock configuration */
-	HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
+//	HAL_RCC_GetClockConfig(&clkconfig, &pFLatency); // 2022.11.13, weird I thought I'd need this one.
 
 //	HAL_InitTick(TICK_INT_PRIORITY);
 
 	/* Compute TIM6 clock */
-	uwTimclock = 2*HAL_RCC_GetPCLK1Freq();
+//	uwTimclock = 2*HAL_RCC_GetPCLK1Freq();
+
+//	uwTimclock = 2*(SystemCoreClock >> APBPrescTable[(RCC->CFGR & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos]);
+	uwTimclock = 2*(SystemCoreClock); // JHM Looks like we just need to call this "SystemCoreClock" somewhere. It's not HAL - defined in system_stm32f7xx.c
+	uwTimclock = 16000000;
 	/* Compute the prescaler value to have TIM6 counter clock equal to 1MHz */
-	uwPrescalerValue = (uint32_t) ((uwTimclock / 1000000U) - 1U);
-
-	/* Initialize TIM6 */
-	htim6_OI.Instance = TIM6;
-
-	/* Initialize TIMx peripheral as follow:
-	+ Period = [(TIM6CLK/1000) - 1]. to have a (1/1000) s time base.
-	+ Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
-	+ ClockDivision = 0
-	+ Counter direction = Up
-	*/
-	htim6_OI.Init.Period = (1000000U / 1000U) - 1U;
-	htim6_OI.Init.Prescaler = uwPrescalerValue;
-	htim6_OI.Init.ClockDivision = 0;
-	htim6_OI.Init.CounterMode = TIM_COUNTERMODE_UP;
+//	uwPrescalerValue = (uint32_t) ((uwTimclock / 1000000U) - 1U);
+//
+//	/* Initialize TIM6 */
+//	htim6_OI.Instance = TIM6;
+//
+//	/* Initialize TIMx peripheral as follow:
+//	+ Period = [(TIM6CLK/1000) - 1]. to have a (1/1000) s time base.
+//	+ Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
+//	+ ClockDivision = 0
+//	+ Counter direction = Up
+//	*/
+//	htim6_OI.Init.Period = (1000000U / 1000U) - 1U;
+//	htim6_OI.Init.Prescaler = uwPrescalerValue;
+//	htim6_OI.Init.ClockDivision = 0;
+//	htim6_OI.Init.CounterMode = TIM_COUNTERMODE_UP;
     // JHM htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_RESET, ChannelState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, ChannelNState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, DMABurstState = HAL_DMA_BURST_STATE_RESET}
 	// HAL htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_RESET, ChannelState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, ChannelNState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, DMABurstState = HAL_DMA_BURST_STATE_RESET}
     // HAL htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_READY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY} // Changes to the last 4 variables (RESET -> READY)
@@ -249,7 +263,7 @@ int main(void)
   *htim6_EGR_OI = (uint32_t)1UL; // Check if this set the following addy to 1 and the above addy stays at 0: 0x40001010UL // Empirically 1 (same) // Looks like this is turned to "1" momentarily to update something, then it's 0, so this implementation seems right
 
   //htim6.Instance = TIM6 within HAL_InitTick() or HAL_InitTick_JHM()
-  uint32_t* htim_Instance_OI = (uint32_t*)0x20000028UL; // Empirically 0x20000028 (same)
+  uint32_t* htim_Instance_OI = (uint32_t*)0x20000028UL; // Empirically 0x20000028 (same) // 2022.11.13, weird was my issue in replacing HAL_InitTick() that is was before the prior htim6 lines and it needed to be after??
   *htim_Instance_OI = 0x40001000UL; // Empirically 0x40001000 (same)
 
 //	HAL_InitTick_JHM(TICK_INT_PRIORITY);
@@ -441,7 +455,7 @@ int main(void)
 
 // JHM Code (Working as of 2022.11.12 !)
   // 2.6.1 (__HAL_RCC_PWR_CLK_ENABLE(); --> SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);)
-  uint32_t* RCC_APB1ENR_OI = (uint32_t *)(0x40023840UL); // ALREADY DEFINED // Empirically 0x40023840 (same)
+//  uint32_t* RCC_APB1ENR_OI = (uint32_t *)(0x40023840UL); // ALREADY DEFINED // Empirically 0x40023840 (same)
   *RCC_APB1ENR_OI |= (1U << 28U); // Empirically 0x10000000 (same). // WAIT no, empirically it's turned from 10000000 to 0x10000010
   *RCC_APB1ENR_OI |= (1U << 4U); // Factors in the change from above
 

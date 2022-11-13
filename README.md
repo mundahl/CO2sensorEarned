@@ -5,6 +5,9 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2022.11.13 PM ----------
+  Summary: It's messy, but the HAL has been rid from the function calls! Now, I'm super interested if I can just delete the HAL files and if everything will still work. Maybe I'll rename them temporarily so that I can return to use them when I eventually get UART up and running (soon soon). 
+
 NEW DATE :: 2022.11.13 ----------
   Summary: Long time no README.md commits. BUT I've been putting in huge hours to strip HAL out. I've been battling a monster named HAL_InitTick(). To fight it, I had to solidify my register understanding, my debug with console abilities, my function creation and mimicking abilities to find that the real bosses were XXX and YYY and for some reason ZZZ. I finally replaced those with my own register calls and definitions. Next up is to truly strip all of the HAL code - some I added back into fight these final bosses (fewer variables = more control = more learning). Then clean clean clean. Then question why each remaining line is actually necessary. Soo so excited to learn, no *EARN*, that minimum viable program and microcontroller manipulations. 
   Aside: In case I need to reference my git flow it's: "git status" (for curiosity), then "git add ." or individual "git add xxx" calls, then "git status" (to check additions), then "git commit -m "[Message]"", then "git status" (for curiosity), then "git push -u origin", then "git status" (for curiosity / confirmation).
