@@ -5,7 +5,11 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
-EW DATE :: 2022.10.14 ----------
+NEW DATE :: 2022.11.13 ----------
+  Summary: Long time no README.md commits. BUT I've been putting in huge hours to strip HAL out. I've been battling a monster named HAL_InitTick(). To fight it, I had to solidify my register understanding, my debug with console abilities, my function creation and mimicking abilities to find that the real bosses were XXX and YYY and for some reason ZZZ. I finally replaced those with my own register calls and definitions. Next up is to truly strip all of the HAL code - some I added back into fight these final bosses (fewer variables = more control = more learning). Then clean clean clean. Then question why each remaining line is actually necessary. Soo so excited to learn, no *EARN*, that minimum viable program and microcontroller manipulations. 
+  Aside: In case I need to reference my git flow it's: "git status" (for curiosity), then "git add ." or individual "git add xxx" calls, then "git status" (to check additions), then "git commit -m "[Message]"", then "git push -u origin", then "git status" (for curiosity / confirmation).
+
+NEW DATE :: 2022.10.14 ----------
   Summary: Finished deconstructing HAL_GPIO_Init(). Wrote code to replace HAL with distilled register manipulation. Ran code, didn't work. I debugged until I found I forgot to type in a line I had written down.. (Gotta love __disable_irq() and __enable_irq() for helping me debug most things!) Now it works flawlessly! Oh I did decide to omit SystemClock_Config() calls for now even though it seems to be creating some dilation (2x my delay) and instability (eventually the toggling stops). Next up, replace HAL_Init() and then come back to SystemClock_Config() before moving onto U(s)ART with my CO2 sensor !
 
 NEW DATE :: 2022.10.13 ----------
