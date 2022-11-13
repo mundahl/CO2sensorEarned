@@ -138,7 +138,323 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+  __disable_irq();
+
+  // HAL_Init();
+
+//  //BLOCK0 HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+//  /* Set Interrupt Group Priority */
+//  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
+// JHM CODE (Working as of 2022.11.12 !)
+  // SCB -> AIRCR Setting
+  uint32_t* SCB_AIRCR_OI = (uint32_t *)0XE000ED0CUL; // Was 0XE000E*0*0CUL, empirically is 0XE000ED0CUL
+  uint32_t SCB_AIRCR_tmp = *SCB_AIRCR_OI;
+  SCB_AIRCR_tmp &= ((uint32_t)(0xFFFFUL << 16 | 7UL << 8U)); // Might need to check types are good
+  SCB_AIRCR_tmp = (SCB_AIRCR_tmp | ((uint32_t)0x5FAUL << 16U) | (3U << 8U));
+  //  *SCB_AIRCR_OI = SCB_AIRCR_tmp; // Empirically expected to be 0x5FA0300 (same?? No... it's 0xFFFF0300)
+  *SCB_AIRCR_OI = 0x5FA0300UL;
+
+//  //BLOCK0 HAL_InitTick(TICK_INT_PRIORITY);
+//  /* Use systick as time base source and configure 1ms tick (default clock after Reset is HSI) */
+//  HAL_InitTick(TICK_INT_PRIORITY);
+
+//	#include "stm32f7xx_hal.h"
+//	#include "stm32f7xx_hal_tim.h"
+  	TIM_HandleTypeDef        htim6_OI; // JHM added 2022.11.12 in debug
+  	// htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 1, AutoReloadPreload = 48}, Channel = (HAL_TIM_ACTIVE_CHANNEL_3 | HAL_TIM_ACTIVE_CHANNEL_6), hdma = {0x0, 0x8000359 <main+336>, 0x80003ba <main+434>, 0x21000000, 0xf0, 0xfa, 0x1}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_BUSY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY}
+  	htim6_OI.Init.RepetitionCounter = 0;
+  	htim6_OI.Init.AutoReloadPreload = 0;
+  	htim6_OI.Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED;
+  	htim6_OI.hdma[0] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[1] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[2] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[3] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[4] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[5] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.hdma[6] = (DMA_HandleTypeDef *) 0x0;
+  	htim6_OI.State = HAL_TIM_STATE_RESET;
+  	htim6_OI.ChannelState[0] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelState[1] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelState[2] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelState[3] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelState[4] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelState[5] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelNState[0] = HAL_TIM_CHANNEL_STATE_RESET;
+  	htim6_OI.ChannelNState[1] = HAL_TIM_CHANNEL_STATE_RESET;
+    htim6_OI.ChannelNState[2] = HAL_TIM_CHANNEL_STATE_RESET;
+    htim6_OI.ChannelNState[3] = HAL_TIM_CHANNEL_STATE_RESET;
+    htim6_OI.DMABurstState = HAL_DMA_BURST_STATE_RESET;
+
+
+    RCC_ClkInitTypeDef    clkconfig;
+	uint32_t              uwTimclock = 0;
+	uint32_t              uwPrescalerValue = 0;
+	uint32_t              pFLatency;
+	/*Configure the TIM6 IRQ priority */
+	HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TICK_INT_PRIORITY ,0);
+
+	/* Enable the TIM6 global Interrupt */
+	HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+
+	/* Enable TIM6 clock */
+	__HAL_RCC_TIM6_CLK_ENABLE();
+
+	/* Get clock configuration */
+	HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
+
+//	HAL_InitTick(TICK_INT_PRIORITY);
+
+	/* Compute TIM6 clock */
+	uwTimclock = 2*HAL_RCC_GetPCLK1Freq();
+	/* Compute the prescaler value to have TIM6 counter clock equal to 1MHz */
+	uwPrescalerValue = (uint32_t) ((uwTimclock / 1000000U) - 1U);
+
+	/* Initialize TIM6 */
+	htim6_OI.Instance = TIM6;
+
+	/* Initialize TIMx peripheral as follow:
+	+ Period = [(TIM6CLK/1000) - 1]. to have a (1/1000) s time base.
+	+ Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
+	+ ClockDivision = 0
+	+ Counter direction = Up
+	*/
+	htim6_OI.Init.Period = (1000000U / 1000U) - 1U;
+	htim6_OI.Init.Prescaler = uwPrescalerValue;
+	htim6_OI.Init.ClockDivision = 0;
+	htim6_OI.Init.CounterMode = TIM_COUNTERMODE_UP;
+    // JHM htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_RESET, ChannelState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, ChannelNState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, DMABurstState = HAL_DMA_BURST_STATE_RESET}
+	// HAL htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_RESET, ChannelState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, ChannelNState = {HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET, HAL_TIM_CHANNEL_STATE_RESET}, DMABurstState = HAL_DMA_BURST_STATE_RESET}
+    // HAL htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 0, AutoReloadPreload = 0}, Channel = HAL_TIM_ACTIVE_CHANNEL_CLEARED, hdma = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_READY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY} // Changes to the last 4 variables (RESET -> READY)
+	// JHM htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 1, AutoReloadPreload = 48}, Channel = (HAL_TIM_ACTIVE_CHANNEL_3 | HAL_TIM_ACTIVE_CHANNEL_6), hdma = {0x0, 0x8000359 <main+336>, 0x80003ba <main+434>, 0x21000000, 0xf0, 0xfa, 0x1}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_BUSY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY}
+	// JHM htim6 = {Instance = 0x40001000, Init = {Prescaler = 31, CounterMode = 0, Period = 999, ClockDivision = 0, RepetitionCounter = 1, AutoReloadPreload = 48}, Channel = (HAL_TIM_ACTIVE_CHANNEL_3 | HAL_TIM_ACTIVE_CHANNEL_6), hdma = {0x0, 0x8000359 <main+336>, 0x80003ba <main+434>, 0x21000000, 0xf0, 0xfa, 0x1}, Lock = HAL_UNLOCKED, State = HAL_TIM_STATE_READY, ChannelState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, ChannelNState = {HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY, HAL_TIM_CHANNEL_STATE_READY}, DMABurstState = HAL_DMA_BURST_STATE_READY}
+
+//	HAL_TIM_Base_Init(&htim6_OI);
+//	HAL_TIM_Base_Start_IT(&htim6_OI);
+
+  // htim CR1
+  uint32_t* htim6_CR1_OI = (uint32_t*)0x40001000UL; // Empirically 0x40001000 (same)
+  *htim6_CR1_OI = (uint32_t)1UL; // Empirically 1 (same)
+
+  // htim ARR
+  uint32_t* htim6_ARR_OI = (uint32_t*)0x4000102CUL; // Empirically 0x4000102c (same)
+  *htim6_ARR_OI = (uint32_t)999UL; // Empirically 999 (same)
+
+  // htim PSC
+  uint32_t *htim6_PSC_OI = (uint32_t*)0x40001028UL; // Empirically 0x40001028 (same)
+  *htim6_PSC_OI = (uint32_t)31UL; // Empirically 31 (same)
+
+  // htim EGR
+  uint32_t *htim6_EGR_OI = (uint32_t*)0x40001014UL; // Empirically 0x40001014 (same)
+  *htim6_EGR_OI = (uint32_t)1UL; // Check if this set the following addy to 1 and the above addy stays at 0: 0x40001010UL // Empirically 1 (same) // Looks like this is turned to "1" momentarily to update something, then it's 0, so this implementation seems right
+
+  //htim6.Instance = TIM6 within HAL_InitTick() or HAL_InitTick_JHM()
+  uint32_t* htim_Instance_OI = (uint32_t*)0x20000028UL; // Empirically 0x20000028 (same)
+  *htim_Instance_OI = 0x40001000UL; // Empirically 0x40001000 (same)
+
+//	HAL_InitTick_JHM(TICK_INT_PRIORITY);
+
+	// Before TIM_Base_SetConfig(): print(*(htim->Instance)) = {CR1 = 1, CR2 = 0, SMCR = 0, DIER = 1, SR = 1, EGR = 0, CCMR1 = 0, CCMR2 = 0, CCER = 0, CNT = 970, PSC = 31, ARR = 999, RCR = 0, CCR1 = 0, CCR2 = 0, CCR3 = 0, CCR4 = 0, BDTR = 0, DCR = 0, DMAR = 0, OR = 0, CCMR3 = 0, CCR5 = 0, CCR6 = 0}
+	// Also, print(htim->Instance) = (TIM_TypeDef *) 0x40001000
+
+
+//	if(HAL_TIM_Base_Init(&htim6) == HAL_OK)
+//	{
+//	  /* Start the TIM time Base generation in interrupt mode */
+//	  HAL_TIM_Base_Start_IT(&htim6); // JM removed the return
+//	}
+//	// deleted the return here too
+
+//	HAL_InitTick(TICK_INT_PRIORITY);
+
+//  //BLOCK1 HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TickPriority ,0);
+//  HAL_NVIC_SetPriority(TIM6_DAC_IRQn, TICK_INT_PRIORITY, 0); // Changed TickPriority to TICK_INT_PRIORITY
+
+//  // NVIC -> IP Setting
+//  uint32_t* NVIC_IP_OI = (uint32_t*)(0xE000E400UL + 54UL); // Might need to check types are good. Empirically 0xE000E436UL (same)
+//  *NVIC_IP_OI = (uint8_t)0UL; // Empirically 0UL (same)
+
+//  //BLOCK1 HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+//  HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+
+//  //NIVC -> ISER Setting
+//  uint32_t* NVIC_ISER_OI = (uint32_t*)0xE000E104UL; // Empirically 0xe000e104 (same)
+//  *NVIC_ISER_OI = (uint32_t)(1U << 22U); // Empirically 0x400000 (same)
+
+//  //BLOCK1 __HAL_RCC_TIM6_CLK_ENABLE();
+//  __HAL_RCC_TIM6_CLK_ENABLE();
+
+//  //RCC -> APB1ENR for TIM6EN
+//  uint32_t* RCC_APB1ENR_OI = (uint32_t *)0x40023840UL; // Empirically 0x40023840 (same)
+//  *RCC_APB1ENR_OI |= (uint32_t)(1U << 4U); // Empirically 16 (same)
+
+//  //BLOCK1 HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
+//  RCC_ClkInitTypeDef    clkconfig_OI;
+//  uint32_t              uwTimclock_OI = 0;
+//  uint32_t              uwPrescalerValue_OI = 0;
+//  uint32_t              pFLatency_OI;
+//  HAL_RCC_GetClockConfig(&clkconfig_OI, &pFLatency_OI); // Changed &clkconfig to &clkconfig_OI, &pFLatency to &pFLatency_OI
+
+//  // HAL_RCC_GetClockConfig()
+//  TIM_HandleTypeDef        htim6; // JHM added 2022.11.12 in debug
+//  RCC_ClkInitTypeDef    clkconfig_OI;
+//  uint32_t              uwTimclock_OI = 0;
+//  uint32_t              uwPrescalerValue_OI = 0;
+//  uint32_t              pFLatency_OI;
+//  // uint32_t* RCC_ClkInitStruct_ClockType_OI = (uint32_t*)0x2004ff9cUL; // Empirically 0x2004ff1c (same) // err maybe actually 0x2004ff1c.. (just wherever RCC_ClkInitStruct->ClockType is)
+//  // *RCC_ClkInitStruct_ClockType_OI = 15UL; // Empirically 15 (same) // This eventually changes to 0x40001000, but not sure when or if that's kosher
+//  clkconfig_OI->ClockType = 15UL;
+//  // uint32_t* RCC_ClkInitStruct_SYSCLKSource_OI = (uint32_t*)0x2004ffa0UL; // Empirically 0x2004ffa0 (same) // err maybe actually 0x2004ff20... (just wherever RCC_ClkInitStruct->SYSCLKSource is)
+//  // *RCC_ClkInitStruct_SYSCLKSource_OI = 0UL; // Empirically 0 (same) // This eventually changes to 0x80004AC, but not sure when or if that's kosher
+//  clkconfig_OI->SYSCLKSource = 0UL;
+//  // uint32_t* RCC_ClkInitStruct_AHBCLKDivider_OI = (uint32_t*)0x2004ffa4UL; // Empirically 0x2004ffa4 (same)// err maybe actually 0x2004ff24... (just wherever RCC_ClkInitStruct->AHBCLKDivider is)
+//  // *RCC_ClkInitStruct_AHBCLKDivider_OI = 0UL; // Empirically 0 (same) // Maybe eventually changes but my manual debugging wrote over the before reading
+//  clkconfig_OI->AHBCLKDivider = 0UL;
+//  // uint32_t* RCC_ClkInitStruct_APB1CLKDivider_OI = (uint32_t*)0x2004ffa8UL; // Empirically 0x2004ffa8 (same) // err maybe actually 0x2004ff28.. (just wherever RCC_ClkInitStruct->APB1CLKDivider is)
+//  // *RCC_ClkInitStruct_APB1CLKDivider_OI = 0UL; // Empirically 0 (same)
+//  clkconfig_OI->APB1CLKDivider = 0UL;
+//  // uint32_t* RCC_ClkInitStruct_APB2CLKDivider_OI = (uint32_t*)0x2004ffacUL; // Empirically 0x2004ffac (same) // err maybe actually 0x2004ff2c.. (just wherever RCC_ClkInitStruct->APB2CLKDivider is)
+//  // *RCC_ClkInitStruct_APB2CLKDivider_OI = 0UL; // Empirically 0 (same)
+//  clkconfig_OI->APB2CLKDivider = 0UL;
+//  // uint32_t* pFLatency_OI = (uint32_t*)0x2004ff98UL; //ALREADY DEFINED // Empirically 0x2004ff98 (same) // err maybe actually 0x2004ff18.. (just wherever FLatency is actually located (thus at pFLatency))
+//  // pFLatency_OI = 0UL; // Empirically 0 (same)
+//  pFLatency_OI = 0UL; // Empirically 0 (same)
+//
+
+//  //BLOCK1 uwTimclock = 2*HAL_RCC_GetPCLK1Freq();
+//  uwTimclock_OI = 2*HAL_RCC_GetPCLK1Freq(); // Changed uwTimclock to uwTimclock_OI
+
+//  //Clock Setting
+//  uwTimclock_OI = 32000000UL; // Might this need to be "uwTimClock" instead of _OI??
+
+//  //BLOCK1 uwPrescalerValue = (uint32_t) ((uwTimclock / 1000000U) - 1U);
+//  uwPrescalerValue_OI = (uint32_t) ((uwTimclock_OI / 1000000U) - 1U); // Added _OI 2x
+
+//  uwPrescalerValue_OI = (uint32_t) ((uwTimclock_OI / 1000000U) - 1U);
+
+//  //BLOCK1 htim6.Instance = TIM6; AND next four
+//  TIM_HandleTypeDef        htim6; // added but unsure ?? if meets my needs
+//  htim6.Instance = TIM6;
+//  htim6.Init.Period = (1000000U / 1000U) - 1U;
+//  htim6.Init.Prescaler = uwPrescalerValue_OI; // Added OI
+//  htim6.Init.ClockDivision = 0;
+//  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+
+//  // uint32_t* htim_Instance_OI = (uint32_t*)0x20000028UL; // Empirically 0x20000028 (same)
+//  // *htim_Instance_OI = 0x40001000UL; // Empirically 0x40001000 (same)
+//	htim6.Instance = TIM6; // Not sure if/how defined
+//  // FOLLOWING NEEDS A REDESIGN AROUND htim (Do I get rid of HAL?)
+//  uint32_t* htim6_Init_Period_OI = (uint32_t*)(0x20000028UL + 12U); // Shoot maybe this htim6 reg is at another addy entirely.. // Empirically 0x20000034 (same)
+//  // Indeed! I debugged and ran print(&htim6) at this spot and got 0x20000028 + 12, so I swapped out 0x40001000UL
+//  *htim6_Init_Period_OI = (uint32_t) ((1000000U / 1000U) - 1U); // Empirically 999 (same)
+//  uint32_t* htim6_Init_Prescaler_OI = (uint32_t*)(0x20000028UL + 4U); // Empirically 0x2000002c (same)
+//  *htim6_Init_Prescaler_OI = uwPrescalerValue_OI; // Empirically 31 (same??)
+//  uint32_t* htim6_Init_ClockDivision_OI = (uint32_t*)(0x20000028UL + 16U); // Empirically 0x20000038 (same)
+//  *htim6_Init_ClockDivision_OI = 0; // Empirically 0 (same)
+//  uint32_t* htim6_Init_CounterMode_OI = (uint32_t*)(0x20000028UL + 8U); // Empirically 0x20000030 (same)
+//  *htim6_Init_CounterMode_OI = 0; // Empirically 0 (same)
+//
+
+//  // BLOCK1 HAL_TIM_Base_Init(&htim6)
+//  HAL_TIM_Base_Init(&htim6);
+
+//  // 2.4.5 Content Revisited
+//
+//  //Clock Unlock (offsets *Instance, Init, Channel, *hdma[7])
+//  //uint32_t* htim6_Lock_OI = (uint32_t*)(0x40001000UL + 24*4U + 6*4U + 7*1U + (6*4U + 12*4U + 2*1U _+ 6*1U + 10*4U)) // DONE: This just seems wrong, the Lock attribute is not at the TIM6 instance
+//  uint32_t* htim6_Lock_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U); // Empirically 0x20000064 (same)
+//  *htim6_Lock_OI = (uint32_t)0x0UL; // Empirically 0 (same)
+//
+//  //Clock State to Busy (offsets *Instance, Init, Channel, *hdma[7], Lock)
+//  uint32_t* htim6_State_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U); // Empirically 0x20000065 (same)
+//  *htim6_State_OI = 2U; // Empirically 2 (same)
+//
+//  // Modify_Reg in TIM_Base_SetConfig() doesn't do anything FYI. Same with "TIMx->CR1 = tmpcr1;"
+//
+//  // htim CR1
+//  uint32_t* htim6_CR1_OI = (uint32_t*)0x40001000UL; // Empirically 0x40001000 (same)
+//  *htim6_CR1_OI = (uint32_t)1UL; // Empirically 1 (same)
+//
+//  // htim ARR
+//  uint32_t* htim6_ARR_OI = (uint32_t*)0x4000102CUL; // Empirically 0x4000102c (same)
+//  *htim6_ARR_OI = (uint32_t)999UL; // Empirically 999 (same)
+//
+//  // htim PSC
+//  uint32_t *htim6_PSC_OI = (uint32_t*)0x40001028UL; // Empirically 0x40001028 (same)
+//  *htim6_PSC_OI = (uint32_t)31UL; // Empirically 31 (same)
+//
+//  // htim EGR
+//  uint32_t *htim6_EGR_OI = (uint32_t*)0x40001014UL; // Empirically 0x40001014 (same)
+//  *htim6_EGR_OI = (uint32_t)1UL; // Check if this set the following addy to 1 and the above addy stays at 0: 0x40001010UL // Empirically 1 (same) // Looks like this is turned to "1" momentarily to update something, then it's 0, so this implementation seems right
+//
+//  // Clock DMABurstState
+//  uint32_t *htim6_DMABS_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U + 1U + 6*1U + 4*1U); // Empirically 0x20000070 (same)
+//  *htim6_DMABS_OI = 1UL; // Empirically 1 (same)
+//
+//  // htim Channel State
+//  uint32_t *htim6_ChSt0_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 0*1U); // Empirically 0x20000066 (same)
+//  *htim6_ChSt0_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChSt1_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 1*1U); // Empirically 0x20000067 (same)
+//  *htim6_ChSt1_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChSt2_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 2*1U); // Empirically 0x20000068 (same)
+//  *htim6_ChSt2_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChSt3_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 3*1U); // Empirically 0x20000069 (same)
+//  *htim6_ChSt3_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChSt4_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 4*1U); // Empirically 0x2000006a (same)
+//  *htim6_ChSt4_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChSt5_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 5*1U); // Empirically 0x2000006b (same)
+//  *htim6_ChSt5_OI = 1UL; // Empirically 1 (same)
+//
+//  // htim Channel N State
+//  uint32_t *htim6_ChNSt0_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 6*1U + 0*1U); // Empirically 0x2000006c (same)
+//  *htim6_ChNSt0_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChNSt1_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 6*1U + 1*1U); // Empirically 0x2000006d (same)
+//  *htim6_ChNSt1_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChNSt2_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 6*1U + 2*1U); // Empirically 0x2000006e (same)
+//  *htim6_ChNSt2_OI = 1UL; // Empirically 1 (same)
+//  uint32_t *htim6_ChNSt3_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U +1U + 6*1U + 3*1U); // Empirically 0x2000006f (same)
+//  *htim6_ChNSt3_OI = 1UL; // Empirically 1 (same)
+//
+//  // Clock State to READY (offsets *Instance, Init, Channel, *hdma[7], Lock)
+//  // uint32_t *htim6_State_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U); // ALREADY DEFINED // Empirically 0x20000065 (same)
+//  *htim6_State_OI = 1; // Empirically 1 (same)
+//
+
+//  //BLOCK1 HAL_TIM_Base_Start_IT(&htim6)
+//  HAL_TIM_Base_Start_IT(&htim6);
+
+//  //2.4.7
+//  // uint32_t *htim6_State_OI = (uint32_t*)(0x20000028UL + 4U + 6*4U + 4U + 7*4U + 1U); // ALREADY DEFINED // Empirically 0x20000065 (same)
+//  *htim6_State_OI = 2; // Empirically 2 (same)
+//
+  // 2.4.7.1
+  uint32_t* htim6_Instance_DIER_OI = (uint32_t *)(0x4000100cUL); // Empirically 0x4000100c (same)
+  *htim6_Instance_DIER_OI |= (uint32_t)1U; // Empirically 1 (same)
+
+  // 2.4.7.2
+  uint32_t* htim_Instance_CR1_OI = (uint32_t *)(0x40001000UL); // Empirically 0x40001000 (same)
+  *htim_Instance_CR1_OI |= (uint32_t)1U; // Empirically 1 (same)
+
+//  //BLOCK0 HAL_MspInit();
+//  /* Init the low level hardware */
+//  HAL_MspInit();
+
+// JHM Code (Working as of 2022.11.12 !)
+  // 2.6.1 (__HAL_RCC_PWR_CLK_ENABLE(); --> SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);)
+  uint32_t* RCC_APB1ENR_OI = (uint32_t *)(0x40023840UL); // ALREADY DEFINED // Empirically 0x40023840 (same)
+  *RCC_APB1ENR_OI |= (1U << 28U); // Empirically 0x10000000 (same). // WAIT no, empirically it's turned from 10000000 to 0x10000010
+  *RCC_APB1ENR_OI |= (1U << 4U); // Factors in the change from above
+
+  // 2.6.2 (__HAL_RCC_SYSCFG_CLK_ENABLE(); --> SET_BIT(RCC->APB2ENR, RCC_APB2ENR_SYSCFGEN);)
+  uint32_t* RCC_APB2ENR_OI = (uint32_t *)(0x40023844UL); // Empirically 0x40023844 (same)
+  *RCC_APB2ENR_OI |= (1U << 14U); // Empirically 0x4000 (same)
+
+  // 2.6.3.3
+  uint8_t* SCB_SHPR10_OI = (uint8_t *)(0xE000ED22UL); // Empirically 0xe000ed22 (same)
+  *SCB_SHPR10_OI = 240UL; // Empirically 240 (same)
+
+
+  __enable_irq();
 
   /* USER CODE BEGIN Init */
 
