@@ -5,6 +5,9 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2022.12.01 PM ----------
+  Summary: There was another, secret boss: removing the HAL from the header calls. It's done. The only headers that we load are stdint.h, cmsis_gcc.h, system_stm32f7xx.h. They probably call some other header files, but they likely don't call any HALs. Wow, now I feel like I suddenly have enough grasp to write drivers. Next up, USART control. Then after proving I've got something going, translating up to USART controls that would control the CO2 sensor. 
+
 NEW DATE :: 2022.11.13 PM ----------
   Summary: It's messy, but the HAL has been rid from the function calls! Now, I'm super interested if I can just delete the HAL files and if everything will still work. Maybe I'll rename them temporarily so that I can return to use them when I eventually get UART up and running (soon soon). 
 
