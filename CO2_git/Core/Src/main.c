@@ -629,7 +629,7 @@ int main(void)
 		for (int aa = 0; aa < nBytes; aa++){
 			for (int bb = 0; bb < nBitsInPacket; bb++) {
 				// Delay 1/baud since last delay
-				JHM_Delay(250);// Temporary while I see if the below logic works
+				JHM_Delay(1);// Temporary while I see if the below logic works
 
 				__disable_irq();
 				// Triage logic per spot in the packet
@@ -648,7 +648,8 @@ int main(void)
 						break;
 					default:
 						// Output the bb'th bit of the aa'th full message (byte)
-						bit_OI = ((fullMessage[aa] & (1 << bb)) >> bb); // either result in 0b00000000 or 0b00000001
+						// bit_OI = ((fullMessage[aa] & (1 << bb)) >> bb); // either result in 0b00000000 or 0b00000001. Oops this shifted all bits one extra! Fix below.
+						bit_OI = ((fullMessage[aa] & (1 << (bb-1))) >> (bb-1));
 						JHM_TxPinWrite(GPIO_Port_OI_SenseAirTx_Addy, Pin_Reg_OI, bit_OI);
 
 				}
@@ -671,7 +672,8 @@ int main(void)
 	// If yes, then display the message somewhere somehow
 
 
-
+    if (0)
+    {
     __disable_irq();
     /*
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
@@ -685,7 +687,8 @@ int main(void)
     *GPIO_Port_OI_ODR_Addy = ((*GPIO_Port_OI_ODR_Addy) ^ (Pin_Reg_OI));
     __enable_irq();
 	/*HAL_Delay(300);*/
-	JHM_Delay(250);
+	JHM_Delay(1);
+    }
 
   }
   /* USER CODE END 3 */

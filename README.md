@@ -5,6 +5,9 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2022.12.04 PM ----------
+  Summary: With the help of an oscope to record the output signal, USB drive to transfer that signal to my computer, and this python script for (bespoke..) analysis, I can now confirm the committed code actually sends the intended packets. Next up is correcting the baud to the correct value. Then architect for sending the message once then listening for the response. 
+
 NEW DATE :: 2022.12.03 PM ----------
   Summary: Moving onto U(S)ART! Defined some SenseAir-S8-specific constants. Defined some STM32F7509-DK-JHM-setup-specific constants. Defined some SenseAir-S8-specific demo payloads. Architected a schema to communicate all of the packets in the demo payload to the same pin used for checking that the blinky works (we didn't actually blink an LED..). It seems to work on first blush with a placeholder delay of 1/2 second rather than using the baud rate. Next is to verify that the right comms are coming out of the packets. Then baud rate. 
 
