@@ -23,7 +23,10 @@
 #include "stdint.h"
 #include "cmsis_gcc.h"
 #include "system_stm32f7xx.h"
+#include <stdio.h> // Needed to use switch-case I think
+
 void JHM_Delay(uint32_t Delay_copy);
+void JHM_TxPinWrite(uint32_t* GPIO_Port_OI_Addy, uint32_t PinWithinPort, uint8_t bit2write);
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -567,14 +570,118 @@ int main(void)
 //    MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
+
+	// U(S)ART CODE BEGINS HERE ----------------------------------
+	__disable_irq();
+	// Define SenseAir S8 UART hard variables (per http://www.co2meters.com/Documentation/Datasheets/DS-S8-rev_P11_1_00.pdf)
+	uint32_t baud_rate = 9600;
+
+	// Res: This hacking via UART was exactly what I needed to understand start bit (LOW!) and stop bit (HIGH!), I think...
+	// https://www.youtube.com/watch?v=01mw0oTHwxg
+	// In short, [start=LOW][8 bit message, ex HIGH, LOW, LOW, HIGH, LOW, LOW, HIGH, HIGH][Parity bit probably skipped][Stop=HIGH or HIGH HIGH]
+	uint8_t start_bit = 0b0; // Not sure if one or zero. I'm starting to think from [a] and [b] that the start and stop bits are just zeros that don't then need to be written.. [a] http://co2meters.com/Documentation/AppNotes/AN168-S8-raspberry-pi-uart.pdf and [b] https://github.com/jcomas/S8_UART/blob/main/src/s8_uart.cpp
+	//uint8_t parity_bit = 0b0; // Parity bit for SenseAir S8 is nonexistent
+	uint8_t stop_bits = 0b11; // Per this resource, stop bit for transmission is two bits. Which two? Per above, probably HIGH and... HIGH?
+
+	uint8_t AnyAddress = 0xFE; // Always seems to come after the start bit
+	uint8_t FunctionalCode = 0x0;
+	uint16_t StartingAddress = 0x0;
+	uint16_t QtyOfRegs = 0x0;
+	uint16_t CRC = 0x0;
+
+	// Define STM32 "Leader" hard variables
+	uint8_t timeDilation = 2; // This is because I didn't set some registers when I ripped out HAL
+	uint32_t* GPIO_Port_OI_SenseAirTx_Addy = (uint32_t*)0x40022014UL; // This is actually the reg that's attached to my Oscope in lab. Eventually We'll pick a different pin
+	int Pin_Num_OI = 2; // This is the pin on that register
+	uint32_t Pin_Reg_OI = 1 << Pin_Num_OI; // bit shifting "1" over to the corresponding pin
+
+    // Determine if needing to check for faults
+
+	// TBD
+
+	// Determine if sending a UART message
+	uint8_t initiate_comm = 0;
+    if (1) { // TBD
+    	initiate_comm = 1;
+    }
+
+	// If yes, what UART message to send
+	 if (initiate_comm == 1) {
+		FunctionalCode = 0x04; // Most common because "Read Input Registers"
+		StartingAddress = 0x0003;
+		QtyOfRegs = 0x0001;
+		CRC = 0xC5D5;
+	}
+
+	__enable_irq();
+	// If yes, write the actual message
+	uint8_t bit_OI = 0;
+    if (initiate_comm == 1) {
+		int nBytes = 8; // Lengths of AnyAddress + FunctionalCode + StartingAddress + QtyOfReds + CRC
+		int nBitsInPacket = 11; // 1-bit Start + 8-bit message + 2-bit stop
+
+		uint8_t fullMessage[8] = {AnyAddress, FunctionalCode, (StartingAddress >> 8), (StartingAddress & 0xFF), (QtyOfRegs >> 8), (QtyOfRegs & 0xFF), (CRC & 0xFF), (CRC >> 8)};
+		// above - 8 is from nBytes, but when using nBNytes there was a compile time error (variable-sized object may not be initialized)
+		//DEBUG uint8_t fullMessage[8] = { 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0, 0xA0 };
+
+		// As default, main's Tx is HIGH
+
+		for (int aa = 0; aa < nBytes; aa++){
+			for (int bb = 0; bb < nBitsInPacket; bb++) {
+				// Delay 1/baud since last delay
+				JHM_Delay(250);// Temporary while I see if the below logic works
+
+				__disable_irq();
+				// Triage logic per spot in the packet
+				switch(bb) {
+					case 0:
+						// Output the start bit to the leader's Tx line (to the follower's Rx)
+						JHM_TxPinWrite(GPIO_Port_OI_SenseAirTx_Addy, Pin_Reg_OI, start_bit);
+						break;
+					case (11 - 2): // 11 from nBitsInPacket
+						// Output the first start bit
+						JHM_TxPinWrite(GPIO_Port_OI_SenseAirTx_Addy, Pin_Reg_OI, stop_bits >> 1);
+						break;
+					case (11 - 1): // 11 from nBitsInPacket
+						// Output the second start bit
+						JHM_TxPinWrite(GPIO_Port_OI_SenseAirTx_Addy, Pin_Reg_OI, stop_bits & 0b1);
+						break;
+					default:
+						// Output the bb'th bit of the aa'th full message (byte)
+						bit_OI = ((fullMessage[aa] & (1 << bb)) >> bb); // either result in 0b00000000 or 0b00000001
+						JHM_TxPinWrite(GPIO_Port_OI_SenseAirTx_Addy, Pin_Reg_OI, bit_OI);
+
+				}
+				__enable_irq();
+			}
+		}
+
+		// As default, main's Tx is HIGH
+
+    }
+
+
+
+	// Determine if trying to receive a UART message
+
+	// If yes, collect each value
+
+    // If yes, then transform the value into a useful.
+
+	// If yes, then display the message somewhere somehow
+
+
+
     __disable_irq();
     /*
     HAL_GPIO_TogglePin(GPIOI, GPIO_PIN_2);
     */
 
     uint32_t* GPIO_Port_OI_ODR_Addy = (uint32_t*)0x40022014UL;
-    int Pin_Num_OI = 2;
-    uint32_t Pin_Reg_OI = 1 << Pin_Num_OI;
+    // int Pin_Num_OI = 2;
+    Pin_Num_OI = 2;
+    // uint32_t Pin_Reg_OI = 1 << Pin_Num_OI;
+    Pin_Reg_OI = 1 << Pin_Num_OI;
     *GPIO_Port_OI_ODR_Addy = ((*GPIO_Port_OI_ODR_Addy) ^ (Pin_Reg_OI));
     __enable_irq();
 	/*HAL_Delay(300);*/
@@ -595,6 +702,16 @@ void JHM_Delay(uint32_t Delay_copy)
 	while ((uwTick_copy - tickstart_copy) < wait_copy)
 	{
 		/* Spending a lot of time doing nothing in this loop */
+	}
+}
+
+void JHM_TxPinWrite(uint32_t* GPIO_Port_OI_Addy, uint32_t PinWithinPort, uint8_t bit2write)
+{
+	if (bit2write) { // If non-zero, so we'd assume the bit is "1"
+		*GPIO_Port_OI_Addy = *GPIO_Port_OI_Addy | PinWithinPort;
+	}
+	else { // If zero "0"
+		*GPIO_Port_OI_Addy = *GPIO_Port_OI_Addy & ~PinWithinPort;
 	}
 }
 

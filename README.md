@@ -5,6 +5,9 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2022.12.03 PM ----------
+  Summary: Moving onto U(S)ART! Defined some SenseAir-S8-specific constants. Defined some STM32F7509-DK-JHM-setup-specific constants. Defined some SenseAir-S8-specific demo payloads. Architected a schema to communicate all of the packets in the demo payload to the same pin used for checking that the blinky works (we didn't actually blink an LED..). It seems to work on first blush with a placeholder delay of 1/2 second rather than using the baud rate. Next is to verify that the right comms are coming out of the packets. Then baud rate. 
+
 NEW DATE :: 2022.12.01 PM ----------
   Summary: There was another, secret boss: removing the HAL from the header calls. It's done. The only headers that we load are stdint.h, cmsis_gcc.h, system_stm32f7xx.h. They probably call some other header files, but they likely don't call any HALs. Wow, now I feel like I suddenly have enough grasp to write drivers. Next up, USART control. Then after proving I've got something going, translating up to USART controls that would control the CO2 sensor. 
 
