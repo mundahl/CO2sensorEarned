@@ -547,6 +547,162 @@ int main(void)
 
   }
 
+  //UART8 IMPLEMENTATION -------------------------------------------------
+  __disable_irq();
+  /**
+   * Started off following: https://hackaday.com/2021/01/08/bare-metal-stm32-universal-asynchronous-communication-with-uarts/
+   */
+  // UART6 gets clock: RCC_APB2ENR (0x44 offset) --> USART6EN (reg 5) set to 1, enabled, per RM
+  uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_APB2ENR_offset = 0x44;
+  uint8_t USART6EN_reg = 5;
+
+  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB1LPENR
+  *RCC_APB2ENR_addy |= (1 << USART6EN_reg); // set the value of that addy to |= (1 << reg#)
+
+  // Enable the clock for the GPIO pins we'll be using (PC6 and PC7, so all of GPIO C)
+  uint32_t RCC_AHB1ENR_offset = 0x30;
+  uint8_t GPIOCEN_bit = 2;
+
+  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
+  *RCC_AHB1ENR_addy |= (1 << GPIOCEN_bit); // set the value of that addy to |= (1 << bit#)
+
+  // Set the PC6 and PC7 "modes" to Alternate Function
+  uint32_t GPIOC_base_addy = 0x40020800;
+  uint32_t GPIOC_MODER_offset = 0x00;
+  uint8_t GPIO_pin_first = 6;
+  uint8_t GPIO_pin_second = 7;
+  uint8_t AF_mode_val = 0b10;
+
+  uint32_t* GPIOC_MODER_addy = (uint32_t*)(GPIOC_base_addy + GPIOC_MODER_offset);
+  *GPIOC_MODER_addy &= ~(0b11 << 2*GPIO_pin_first); // clear the bits
+  *GPIOC_MODER_addy &= ~(0b11 << 2*GPIO_pin_second);
+  *GPIOC_MODER_addy |= (AF_mode_val << 2*GPIO_pin_first); // set the bits
+  *GPIOC_MODER_addy |= (AF_mode_val << 2*GPIO_pin_second);
+
+  // Set the PC6 and PC7 "speeds" to maximum
+  //uint32_t GPIOC_base_addy = 0x40020800;
+  uint32_t GPIOC_OSPEEDR_offset = 0x08;
+  //uint8_t GPIO_pin_first = 6;
+  //uint8_t GPIO_pin_second = 7;
+  uint8_t OSPEEDR_val = 0b11; // highest speed setting
+
+  uint32_t* GPIOC_OSPEEDR_addy = (uint32_t*)(GPIOC_base_addy + GPIOC_OSPEEDR_offset);
+  *GPIOC_OSPEEDR_addy &= ~(0b11 << 2*GPIO_pin_first); // clear the bits
+  *GPIOC_OSPEEDR_addy &= ~(0b11 << 2*GPIO_pin_second);
+  *GPIOC_OSPEEDR_addy |= (OSPEEDR_val << 2*GPIO_pin_first); // set the bits
+  *GPIOC_OSPEEDR_addy |= (OSPEEDR_val << 2*GPIO_pin_second);
+
+  // Which STM32 pins will transport the Tx and Rx signals? Ans: Tx on PC6, Rx on PC7 --> AF8 for PC6 and PC7.
+  //uint32_t GPIOC_base_addy = 0x40020800;
+  uint32_t GPIOx_AFRL_offset = 0x20;
+  uint8_t AFR_Tx = 6; // If >7, then must switch to AFRH offset and adjusted logic
+  uint8_t AFR_Rx = 7; // If >7, then must switch to AFRH offset and adjusted logic
+  uint8_t AF_OfInterest = 8;
+  uint8_t regPerAF = 4;
+
+  uint32_t* GPIOC_AFRL_addy = (uint32_t*)(GPIOC_base_addy + GPIOx_AFRL_offset);
+  uint32_t GPIOC_AFRL_tmp = *GPIOC_AFRL_addy;
+  uint32_t AFR_Tx_mask = ~(0xF << (regPerAF*AFR_Tx)); // TRANSMIT (Tx)
+  GPIOC_AFRL_tmp &= AFR_Tx_mask; // Sets the values in the 4 (of 32) regs that represent AFR_Tx to 0s
+  GPIOC_AFRL_tmp |= (AF_OfInterest << (regPerAF*AFR_Tx));
+  uint32_t AFR_Rx_mask = ~(0xF << (regPerAF*AFR_Rx)); // RECEIVE (Rx)
+  GPIOC_AFRL_tmp &= AFR_Rx_mask; // Sets the values in the 4 (of 32) regs that represent AFR_Tx to 0s
+  GPIOC_AFRL_tmp |= (AF_OfInterest << (regPerAF*AFR_Rx));
+  *GPIOC_AFRL_addy = GPIOC_AFRL_tmp;
+
+  // Disable USART6 itself (not just the clock). This is needed to edit other regs. Maybe just the opposite, says: https://controllerstech.com/how-to-setup-uart-using-registers-in-stm32/
+  uint32_t USART6_base_addy = 0x40011400;
+  uint8_t USART_CR1_offset = 0x00;
+  uint32_t* USART6_CR1_addy = (uint32_t*)(USART6_base_addy + USART_CR1_offset);
+  *USART6_CR1_addy &= (0xFFFFFFFF ^ 1);
+
+  // Enable USART6 itself
+  *USART6_CR1_addy |= (1 << 0);
+
+  // Set the message byte length --> 8 bytes so M0 and M1 are both 0 per the RM
+  uint32_t USART_CR1_M0bit = 12;
+  uint32_t USART_CR1_M1bit = 28;
+  uint8_t M0_8 = 0;
+  uint8_t M1_8 = 0;
+  if (M0_8 == 0) {
+	  *USART6_CR1_addy &= ~(1 << USART_CR1_M0bit);
+  } else {
+	  *USART6_CR1_addy |= (1 << USART_CR1_M0bit);
+  }
+
+  if (M1_8 == 0) {
+	  *USART6_CR1_addy &= ~(1 << USART_CR1_M1bit);
+  } else {
+	  *USART6_CR1_addy |= (1 << USART_CR1_M1bit);
+  }
+
+  // Set stop length
+  uint32_t USART_CR2_offset = 0x04;
+  uint8_t first_stop_bit = 12;
+  uint8_t stop_value = 0b10;
+  uint32_t stop_mask = (0b11 << first_stop_bit);
+  uint32_t* USART6_CR2_addy = (uint32_t*)(USART6_base_addy + USART_CR2_offset);
+  *USART6_CR2_addy &= ~stop_mask; // turn the first and second stop bit to 0
+  *USART6_CR2_addy |= (stop_value << first_stop_bit);
+
+  // Baud Rate setting
+  //uint32_t USART6_base_addy = 0x40011400;
+  uint8_t USART_BRR_offset = 0x0C;
+  uint32_t baud_rate = 9600;
+  uint16_t uart_div = SystemCoreClock / baud_rate;
+  uint8_t reg_offset = 4;
+  uint32_t USART_BRR_val = (((uart_div / (1 << reg_offset)) << reg_offset) | ((uart_div % (1 << reg_offset)) << 0));
+  // ABOVE, oh, so they're accommodating a decimal by dedicating the first four bits to the decimal. 2^4 = 16, so 1/16th accuracy.
+
+  uint32_t* USART6_BRR_addy = (uint32_t*)(USART6_base_addy + USART_BRR_offset);
+  *USART6_BRR_addy = USART_BRR_val;
+
+  // Enable USART6 itself (not just the clock)
+  //uint32_t USART6_base_addy = 0x40011400;
+  //uint8_t USART_CR1_offset = 0x00;
+  //uint32_t* USART6_CR1_addy = (uint32_t*)(USART6_base_addy + USART_CR1_offset);
+  *USART6_CR1_addy |= (1 << 0);
+
+  // Set Transmitter Enable (TE)
+  uint8_t TEbit = 3;
+  *USART6_CR1_addy |= (1 << TEbit);
+
+
+  // Set Receiver Enable (RE)
+  uint8_t REbit = 2;
+  // *USART6_CR1_addy |= (1 << REbit);
+
+  // Send data and wait for send to complete
+  uint8_t data = 0x80; // random gibberish that I think will be recognizable
+  uint32_t USART_TDR_offset = 0x28;
+  uint32_t* USART6_TDR_addy = (uint32_t*)(USART6_base_addy + USART_TDR_offset);
+  if(0) {
+	  *USART6_TDR_addy = data;
+  }
+
+  // Wait for data transmission to complete
+  uint32_t USART_ISR_offset = 0x1C;
+  uint8_t TC_bit = 6;
+  uint32_t* USART_ISR_addy = (uint32_t*)(USART6_base_addy + USART_ISR_offset);
+  if(0) {
+	  while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
+  }
+
+  // Wait for the data reception to so start
+  uint32_t RXNE_bit = 5;
+  //while ((*USART_ISR_addy & (1 << RXNE_bit)) == 0) {};
+
+  // Receive data
+  uint32_t USART_RDR_offset = 0x24;
+  uint32_t* USART6_RDR_addy = (uint32_t*)(USART6_base_addy + USART_RDR_offset);
+  uint8_t RxMessage[14] = {0};
+
+  // Then I could try to send to the sensor + oscope the Tx line
+  // Then I could switch the oscope to the Rx line to see if there's a response
+  // Then I can implement logic to try to record and process the Rx signal
+
+  __enable_irq();
 
   /* USER CODE END 2 */
 
@@ -573,6 +729,17 @@ int main(void)
 
 	// U(S)ART CODE BEGINS HERE ----------------------------------
 	__disable_irq();
+
+	// START: Run the UART8 IMPLEMENTATION -------------------------------------------------
+	if (0) {
+		*USART6_TDR_addy = data;
+		while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
+		*USART6_TDR_addy = 0x07;
+		while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
+	}
+	// STOP: Run the UART8 IMPLEMENTATION -------------------------------------------------
+
+
 	// Define SenseAir S8 UART hard variables (per http://www.co2meters.com/Documentation/Datasheets/DS-S8-rev_P11_1_00.pdf)
 	uint32_t baud_rate = 9600;
 
@@ -613,10 +780,35 @@ int main(void)
 		CRC = 0xC5D5;
 	}
 
+	// START: Run the UART8 IMPLEMENTATION full message -------------------------------------------------
+	if (1) {
+		uint8_t fullMessage[8] = {AnyAddress, FunctionalCode, (StartingAddress >> 8), (StartingAddress & 0xFF), (QtyOfRegs >> 8), (QtyOfRegs & 0xFF), (CRC & 0xFF), (CRC >> 8)};
+		// above - 8 is from nBytes, but when using nBNytes there was a compile time error (variable-sized object may not be initialized)
+
+		uint8_t fullMessage2[8] = {0xFE,0x06,0x00,0x1F,0x00,0x00,0xAC,0x03};
+
+		for (int aa = 0; aa < 8; aa++) {
+			*USART6_TDR_addy = fullMessage2[aa];
+			while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
+		}
+
+		*USART6_CR1_addy |= (1 << REbit); // Enable receiver, thus start looking for a start bit from the Rx line
+		for (int aa = 0; aa < 9; aa++) {
+			while ((*USART_ISR_addy & (1 << RXNE_bit)) == 0) {}; // wait while ISR -> RXNE == 0, thus data is not received (yet..)
+			RxMessage[aa] = (*USART6_RDR_addy & 0xFF);
+			//printf((uint8_t)RxMessage[aa]);
+		}
+
+
+
+	}
+	// STOP: Run the UART8 IMPLEMENTATION full message -------------------------------------------------
+
 	__enable_irq();
 	// If yes, write the actual message
 	uint8_t bit_OI = 0;
-    if (initiate_comm == 1) {
+    //if (initiate_comm == 1) {
+    if (0) {
 		int nBytes = 8; // Lengths of AnyAddress + FunctionalCode + StartingAddress + QtyOfReds + CRC
 		int nBitsInPacket = 11; // 1-bit Start + 8-bit message + 2-bit stop
 
