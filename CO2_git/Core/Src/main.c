@@ -782,6 +782,8 @@ int main(void)
 
 	// START: Run the UART8 IMPLEMENTATION full message -------------------------------------------------
 	if (1) {
+		*USART6_CR1_addy |= (1 << REbit); // Enable receiver, thus start looking for a start bit from the Rx line
+
 		uint8_t fullMessage[8] = {AnyAddress, FunctionalCode, (StartingAddress >> 8), (StartingAddress & 0xFF), (QtyOfRegs >> 8), (QtyOfRegs & 0xFF), (CRC & 0xFF), (CRC >> 8)};
 		// above - 8 is from nBytes, but when using nBNytes there was a compile time error (variable-sized object may not be initialized)
 
@@ -792,8 +794,7 @@ int main(void)
 			while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
 		}
 
-		*USART6_CR1_addy |= (1 << REbit); // Enable receiver, thus start looking for a start bit from the Rx line
-		for (int aa = 0; aa < 9; aa++) {
+		for (int aa = 0; aa < 8; aa++) {
 			while ((*USART_ISR_addy & (1 << RXNE_bit)) == 0) {}; // wait while ISR -> RXNE == 0, thus data is not received (yet..)
 			RxMessage[aa] = (*USART6_RDR_addy & 0xFF);
 			//printf((uint8_t)RxMessage[aa]);
