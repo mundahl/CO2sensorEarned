@@ -547,24 +547,255 @@ int main(void)
 
   }
 
+  //START: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
+  /*
+   * RM gives the following Programming Instructions
+   * - Enable the LTDC clock in the RCC register.
+   * - Configure the required pixel clock following the panel datasheet.
+   * - Configure the synchronous timings: VSYNC, HSYNC, vertical and horizontal back
+   *   porch, active data area and the front porch timings following the panel datasheet as
+   *   described in the Section 18.4.1: LTDC global configuration parameters.
+   *   • Configure the synchronous signals and clock polarity in the LTDC_GCR register.
+   *   • If needed, configure the background color in the LTDC_BCCR register.
+   *   • Configure the needed interrupts in the LTDC_IER and LTDC_LIPCR register.
+   *   • Configure the layer1/2 parameters by:
+   *   – programming the layer window horizontal and vertical position in the
+   *   LTDC_LxWHPCR and LTDC_WVPCR registers. The layer window must be in the
+   *   active data area.
+   *   – programming the pixel input format in the LTDC_LxPFCR register
+   *   – programming the color frame buffer start address in the LTDC_LxCFBAR register
+   *   – programming the line length and pitch of the color frame buffer in the
+   *   LTDC_LxCFBLR register
+   *   – programming the number of lines of the color frame buffer in the
+   *   LTDC_LxCFBLNR register
+   *   – if needed, loading the CLUT with the RGB values and its address in the
+   *   LTDC_LxCLUTWR register
+   *   – If needed, configuring the default color and the blending factors respectively in the
+   *   LTDC_LxDCCR and LTDC_LxBFCR registers
+   *   • Enable layer1/2 and if needed the CLUT in the LTDC_LxCR register.
+   *   • If needed, enable dithering and color keying respectively in the LTDC_GCR and
+   *   LTDC_LxCKCR registers. They can be also enabled on the fly.
+   *   • Reload the shadow registers to active register through the LTDC_SRCR register.
+   *   • Enable the LCD-TFT controller in the LTDC_GCR register.
+   *   • All layer parameters can be modified on the fly except the CLUT. The new configuration
+   *   has to be either reloaded immediately or during vertical blanking period by configuring
+   *   the LTDC_SRCR register.
+   *
+   *   Overkill, I'm using this to help walk me through it: https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
+   *
+   */
+
+  // Enable the RCC Clock for the LTDC peripheral
+  uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_APB2ENR_offset = 0x44;
+  uint8_t LTDCEN_reg = 26;
+
+  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB2ENR
+  *RCC_APB2ENR_addy |= (1 << LTDCEN_reg); // set the value of that addy to |= (1 << reg#)
+
+  // Turn the clock up to max speed
+  // uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_CR_offset = 0x0;
+  uint8_t HSEON_reg = 16;
+
+  uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
+  *RCC_CR_addy |= (1 << HSEON_reg); // set the value of that addy to |= (1 << reg#)
+
+  // Wait until the HSE oscillator (that we just enabled) is ready
+  // uint32_t RCC_base_addy = 0x40023800;
+  // uint32_t RCC_CR_offset = 0x0;
+  uint8_t HSERDY_reg = 17;
+
+  //uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
+  while (!(*RCC_CR_addy & (1 << HSERDY_reg))); // when the HSERDY reg in RCC_RC is flips from 0 to 1, then we can finally move on
+
+  // Set the delay for the flash memory (??)
+  uint32_t Flash_base_addy = 0x40023C00;
+  uint32_t FLash_ACR_offset = 0x00;
+  uint8_t Flash_ACR_Latency_reg = 0;
+  uint8_t Latency_WaitState5 = 5;
+
+  uint32_t* Flash_ACR_addy = (uint32_t*)(Flash_base_addy + FLash_ACR_offset);
+  *Flash_ACR_addy &= ~(0xF << Flash_ACR_Latency_reg); // Revisit if needed. I'm trtying to clear the 0-3 bits to zero
+  *Flash_ACR_addy |= (Latency_WaitState5 << Flash_ACR_Latency_reg);
+
+  //Set the desired RCC frequency with the programmable dividers
+  // uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_PLLCFGR_offset = 0x4;
+  uint32_t PLLM_bit_offset = 0;
+  uint32_t PLLN_bit_offset = 5;
+  uint8_t PLLM_val = 0b11001; // RCC_PLLCFGR_PLLM_0 | RCC_PLLCFGR_PLLM_3 | RCC_PLLCFGR_PLLM_4
+  uint16_t PLLN_val = 0b110110000; // RCC_PLLCFGR_PLLN_4 | RCC_PLLCFGR_PLLN_5 | RCC_PLLCFGR_PLLN_7 | RCC_PLLCFGR_PLLN_8
+  uint32_t PLLSRC_bit_offset = 22;
+
+  uint32_t* RCC_PLLCFGR_addy = (uint32_t*)(RCC_base_addy + RCC_PLLCFGR_offset);
+  //*RCC_PLLCFGR_addy &=PLLM_val ~(); // Eh, I probably don't need to reset these back to zero, so I'm leaving this line incomplete
+  *RCC_PLLCFGR_addy |= (PLLM_val << PLLM_bit_offset);
+  *RCC_PLLCFGR_addy |= (PLLN_val << PLLN_bit_offset);
+  *RCC_PLLCFGR_addy |= (1 << PLLSRC_bit_offset);
+
+  // Enable the PLL then wait for the corresponding ready bit to flip to 1
+  uint32_t PLLON_bit_offset = 24;
+  uint32_t PLLRDY_bit_offset = 25;
+
+  *RCC_CR_addy |= (1 << PLLON_bit_offset);
+  while (!(*RCC_CR_addy & (1 << PLLRDY_bit_offset)));
+
+  // Assign the output of the PLL as the system frequency (and wait for the corresponding bit to flip to 1)
+  uint32_t RCC_CFGR_offset = 0x08;
+  uint32_t RCC_CFGR_SW_bit_offset = 0x0;
+  uint32_t RCC_CFGR_SW_PLL_val = 0x2;
+
+  uint32_t* RCC_CFGR_addy = (uint32_t*)(RCC_base_addy + RCC_CFGR_offset);
+  *RCC_CFGR_addy |= (RCC_CFGR_SW_PLL_val << RCC_CFGR_SW_bit_offset);
+  while((*RCC_CFGR_addy & (3 << 2)) != (2 << 2)) {} // Admittedly could look more into these stands for RCC_CFGR_SWS and RCC_CFGR_SWS_1
+
+  // Setting Pixel Clock of ~9 MHz per the display RM (Display frequency nominal is 9)
+  uint32_t PLLSAICFGR_offset = 0x88;
+  uint32_t PLLSAIN_bit_offset = 6;
+  uint32_t PLLSAIN_val = 0x11000000;
+  uint32_t PLLSAIR_bit_offset = 28;
+  uint32_t PLLSAIR_val = 0x101;
+  uint32_t DCKCFGR1_offset = 0x8c;
+  uint32_t PLLSAIDIVR_0_bit_offset = 16;
+  uint32_t PLLSAIDIVR_1_bit_offset = 17;
+
+  uint32_t* RCC_PLLSAICFGR_addy = (uint32_t*)(RCC_base_addy + PLLSAICFGR_offset);
+  *RCC_PLLSAICFGR_addy |= (PLLSAIN_val << PLLSAIN_bit_offset);
+  *RCC_PLLSAICFGR_addy |= (PLLSAIR_val << PLLSAIR_bit_offset);
+  uint32_t* RCC_DCKCFGR1_addy = (uint32_t*)(RCC_base_addy + DCKCFGR1_offset);
+  *RCC_DCKCFGR1_addy |= (1 << PLLSAIDIVR_0_bit_offset);
+  *RCC_DCKCFGR1_addy &= ~(1 << PLLSAIDIVR_1_bit_offset);
+
+  // Enable PLLSAI and wait for the corresponding ready bit to flip
+  uint32_t PLLSAION_bit_offset = 28;
+  uint32_t PLLSAIRDY_bit_offset = 29;
+
+  *RCC_CR_addy |= (1 << PLLSAION_bit_offset);
+  while (!(*RCC_CR_addy & (1 << PLLSAIRDY_bit_offset)));
+
+  // Turn on the RCC for all of the GPIOs (maybe not needed)
+  uint32_t RCC_AHB1ENR_offset = 0x30;
+  uint32_t AllGPIO_on_val = 0b11111111111;
+
+  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
+  *RCC_AHB1ENR_addy |= AllGPIO_on_val;
+
+
+
+  // CONFIGURE THE GPIO OUTPUTS
+  // Set all relevant GPIO pins to AF
+  // -- LCB_BL_CTL --> PK3
+
+  // -- LCD_CLK --> PI14
+
+  // -- LCD_HSYNC --> PI10
+
+  // -- LCD_VSYNC --> PI9
+
+  // -- LCD_DE --> PK7
+
+  // -- LCD_DISP --> PI12
+
+  // -- LCD_BL_A -- No GPIO input
+
+  // -- LCD_BL_K -- No GPIO input
+
+  // -- LCD_INT --> PI13
+
+  // -- LCD_SCL --> PH7
+
+  // -- LCD_SDA --> PH8
+
+  // -- LCD_RST --> NRST????
+
+
+
+  // -- LCD_R0 --> PI15
+
+  // -- LCD_R1 --> PJ0
+  uint32_t GPIOJ_base_addy = 0x40022400;
+  uint32_t GPIOx_MODER_offset = 0;
+  uint8_t  pin0_bit_start = 0;
+  uint8_t  AF_val = 0b10;
+
+  uint32_t* GPIOJ_MODER_addy = (uint32_t*)(GPIOJ_base_addy + GPIOx_MODER_offset);
+  *GPIOJ_MODER_addy |= (AF_val << pin0_bit_start);
+
+  // -- LCD_R2 --> PJ1
+
+  // -- LCD_R3 --> PJ2
+
+  // -- LCD_R4 --> PJ3
+
+  // -- LCD_R5 --> PJ4
+
+  // -- LCD_R6 --> PJ5
+
+  // -- LCD_R7 --> PJ6
+
+
+
+  // -- LCD_G0 --> PJ7
+
+  // -- LCD_G1 --> PJ8
+
+  // -- LCD_G2 --> PJ9
+
+  // -- LCD_G3 --> PJ10
+
+  // -- LCD_G4 --> PJ11
+
+  // -- LCD_G5 --> PK0
+
+  // -- LCD_G6 --> PK1
+
+  // -- LCD_G7 --> PK2
+
+
+
+  // -- LCD_B0 --> PE4
+
+  // -- LCD_B1 --> PJ13
+
+  // -- LCD_B2 --> PJ14
+
+  // -- LCD_B3 --> PJ15
+
+  // -- LCD_B4 --> PG12
+
+  // -- LCD_B5 --> PK4
+
+  // -- LCD_B6 --> PK5
+
+  // -- LCD_B7 --> PK6
+
+  // Set all AFs to the right LCD function
+
+
+  // Set all of these GPIO pins to a fast frequency (TBD)
+
+
+  //END: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
+
   //UART8 IMPLEMENTATION -------------------------------------------------
   __disable_irq();
   /**
    * Started off following: https://hackaday.com/2021/01/08/bare-metal-stm32-universal-asynchronous-communication-with-uarts/
    */
   // UART6 gets clock: RCC_APB2ENR (0x44 offset) --> USART6EN (reg 5) set to 1, enabled, per RM
-  uint32_t RCC_base_addy = 0x40023800;
-  uint32_t RCC_APB2ENR_offset = 0x44;
+  // uint32_t RCC_base_addy = 0x40023800; // defined earlier now!
+  // uint32_t RCC_APB2ENR_offset = 0x44; // defined earlier now!
   uint8_t USART6EN_reg = 5;
 
-  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB1LPENR
+  // uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB1LPENR // defined earlier now!
   *RCC_APB2ENR_addy |= (1 << USART6EN_reg); // set the value of that addy to |= (1 << reg#)
 
   // Enable the clock for the GPIO pins we'll be using (PC6 and PC7, so all of GPIO C)
-  uint32_t RCC_AHB1ENR_offset = 0x30;
+  //uint32_t RCC_AHB1ENR_offset = 0x30;
   uint8_t GPIOCEN_bit = 2;
 
-  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
+  // uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
   *RCC_AHB1ENR_addy |= (1 << GPIOCEN_bit); // set the value of that addy to |= (1 << bit#)
 
   // Set the PC6 and PC7 "modes" to Alternate Function
@@ -697,10 +928,11 @@ int main(void)
   uint32_t USART_RDR_offset = 0x24;
   uint32_t* USART6_RDR_addy = (uint32_t*)(USART6_base_addy + USART_RDR_offset);
   uint8_t RxMessage[14] = {0};
+  uint32_t CO2_now = 0;
 
-  // Then I could try to send to the sensor + oscope the Tx line
-  // Then I could switch the oscope to the Rx line to see if there's a response
-  // Then I can implement logic to try to record and process the Rx signal
+  // Then I could try to send to the sensor + oscope the Tx line --> DONE
+  // Then I could switch the oscope to the Rx line to see if there's a response --> DONE
+  // Then I can implement logic to try to record and process the Rx signal --> DONE!
 
   __enable_irq();
 
@@ -728,9 +960,9 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	// U(S)ART CODE BEGINS HERE ----------------------------------
-	__disable_irq();
 
 	// START: Run the UART8 IMPLEMENTATION -------------------------------------------------
+	  // This was one-off calls that proved a point in development, but has since been abandoned for a flexible recurring implementation instead
 	if (0) {
 		*USART6_TDR_addy = data;
 		while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
@@ -789,23 +1021,29 @@ int main(void)
 
 		uint8_t fullMessage2[8] = {0xFE,0x06,0x00,0x1F,0x00,0x00,0xAC,0x03};
 
+		__disable_irq();
+
 		for (int aa = 0; aa < 8; aa++) {
-			*USART6_TDR_addy = fullMessage2[aa];
+			*USART6_TDR_addy = fullMessage[aa];
 			while ((*USART_ISR_addy & (1 << TC_bit)) == 0) {};
 		}
 
-		for (int aa = 0; aa < 8; aa++) {
+		for (int aa = 0; aa < 7; aa++) {
 			while ((*USART_ISR_addy & (1 << RXNE_bit)) == 0) {}; // wait while ISR -> RXNE == 0, thus data is not received (yet..)
 			RxMessage[aa] = (*USART6_RDR_addy & 0xFF);
 			//printf((uint8_t)RxMessage[aa]);
 		}
 
+		CO2_now = (256*RxMessage[3] + RxMessage[4]);
 
+
+		__enable_irq();
+
+		JHM_Delay(500);
 
 	}
 	// STOP: Run the UART8 IMPLEMENTATION full message -------------------------------------------------
 
-	__enable_irq();
 	// If yes, write the actual message
 	uint8_t bit_OI = 0;
     //if (initiate_comm == 1) {
