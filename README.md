@@ -5,6 +5,10 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2023.01.22 PM1 ----------
+  Summary: My Github authentication - a personal access token - expired on 2022.12.27, so when I returned to committing today, I had to renew that. In short, I tried to "git push -u origin" a commit, but got "Invalid username or password." and a suggestion to "Please see https://docs.github.com/en/get-started/getting-started-with-git/about-remote-repositories#cloning-with-https-urls ". So I did, generated a new personal access key, copied the key, checked all of the access boxes. Then I called "git push -u origin" and logged in with "mundahl" as username and the key as my password. Everything was good. To get a few more reps at this, I set the expiration to just 60 days, so I'll have to do it again soon. 
+  The code that's been added and modified is to setup the LCD display from bare-metal. It's a doozy. This specific commit doesn't have the CO2 reading work anymore. Not exactly sure why. I might debug that first, then hop back into the LCD support. 
+
 NEW DATE :: 2022.12.23 PM2 ----------
   Summary: I didn't have any ~guides to follow for the Rx capture. So I thought through my prior steps and didn't love that the receive enable bit for UART6 was turned 'on' right before looking for a received message and right after sending the transmit message. I moved the Rx Enable bit setting before the Tx messaging. BOM! It instantly started identifying Rx messages and reading them. New problem: the Rx while loop never ended. Fixed that with a byte count error (9 is now 8). We're working now! Next up, improve my dev tools to see what's received easier. And in parallel send new commands to actually read CO2 !
 
