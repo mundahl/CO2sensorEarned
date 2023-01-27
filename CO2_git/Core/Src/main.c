@@ -547,236 +547,801 @@ int main(void)
 
   }
 
-//  //START: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
-//  /*
-//   * RM gives the following Programming Instructions
-//   * - Enable the LTDC clock in the RCC register.
-//   * - Configure the required pixel clock following the panel datasheet.
-//   * - Configure the synchronous timings: VSYNC, HSYNC, vertical and horizontal back
-//   *   porch, active data area and the front porch timings following the panel datasheet as
-//   *   described in the Section 18.4.1: LTDC global configuration parameters.
-//   *   • Configure the synchronous signals and clock polarity in the LTDC_GCR register.
-//   *   • If needed, configure the background color in the LTDC_BCCR register.
-//   *   • Configure the needed interrupts in the LTDC_IER and LTDC_LIPCR register.
-//   *   • Configure the layer1/2 parameters by:
-//   *   – programming the layer window horizontal and vertical position in the
-//   *   LTDC_LxWHPCR and LTDC_WVPCR registers. The layer window must be in the
-//   *   active data area.
-//   *   – programming the pixel input format in the LTDC_LxPFCR register
-//   *   – programming the color frame buffer start address in the LTDC_LxCFBAR register
-//   *   – programming the line length and pitch of the color frame buffer in the
-//   *   LTDC_LxCFBLR register
-//   *   – programming the number of lines of the color frame buffer in the
-//   *   LTDC_LxCFBLNR register
-//   *   – if needed, loading the CLUT with the RGB values and its address in the
-//   *   LTDC_LxCLUTWR register
-//   *   – If needed, configuring the default color and the blending factors respectively in the
-//   *   LTDC_LxDCCR and LTDC_LxBFCR registers
-//   *   • Enable layer1/2 and if needed the CLUT in the LTDC_LxCR register.
-//   *   • If needed, enable dithering and color keying respectively in the LTDC_GCR and
-//   *   LTDC_LxCKCR registers. They can be also enabled on the fly.
-//   *   • Reload the shadow registers to active register through the LTDC_SRCR register.
-//   *   • Enable the LCD-TFT controller in the LTDC_GCR register.
-//   *   • All layer parameters can be modified on the fly except the CLUT. The new configuration
-//   *   has to be either reloaded immediately or during vertical blanking period by configuring
-//   *   the LTDC_SRCR register.
-//   *
-//   *   Overkill, I'm using this to help walk me through it: https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
-//   *
-//   */
-//
-//  // Enable the RCC Clock for the LTDC peripheral
-//  uint32_t RCC_base_addy = 0x40023800;
-//  uint32_t RCC_APB2ENR_offset = 0x44;
-//  uint8_t LTDCEN_reg = 26;
-//
-//  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB2ENR
-//  *RCC_APB2ENR_addy |= (1 << LTDCEN_reg); // set the value of that addy to |= (1 << reg#)
-//
-//  // Turn the clock up to max speed
-//  // uint32_t RCC_base_addy = 0x40023800;
-//  uint32_t RCC_CR_offset = 0x0;
-//  uint8_t HSEON_reg = 16;
-//
-//  uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
-//  *RCC_CR_addy |= (1 << HSEON_reg); // set the value of that addy to |= (1 << reg#)
-//
-//  // Wait until the HSE oscillator (that we just enabled) is ready
-//  // uint32_t RCC_base_addy = 0x40023800;
-//  // uint32_t RCC_CR_offset = 0x0;
-//  uint8_t HSERDY_reg = 17;
-//
-//  //uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
-//  while (!(*RCC_CR_addy & (1 << HSERDY_reg))); // when the HSERDY reg in RCC_RC is flips from 0 to 1, then we can finally move on
-//
-//  // Set the delay for the flash memory (??)
-//  uint32_t Flash_base_addy = 0x40023C00;
-//  uint32_t FLash_ACR_offset = 0x00;
-//  uint8_t Flash_ACR_Latency_reg = 0;
-//  uint8_t Latency_WaitState5 = 5;
-//
-//  uint32_t* Flash_ACR_addy = (uint32_t*)(Flash_base_addy + FLash_ACR_offset);
-//  *Flash_ACR_addy &= ~(0xF << Flash_ACR_Latency_reg); // Revisit if needed. I'm trtying to clear the 0-3 bits to zero
-//  *Flash_ACR_addy |= (Latency_WaitState5 << Flash_ACR_Latency_reg);
-//
-//  //Set the desired RCC frequency with the programmable dividers
-//  // uint32_t RCC_base_addy = 0x40023800;
-//  uint32_t RCC_PLLCFGR_offset = 0x4;
-//  uint32_t PLLM_bit_offset = 0;
-//  uint32_t PLLN_bit_offset = 5;
-//  uint8_t PLLM_val = 0b11001; // RCC_PLLCFGR_PLLM_0 | RCC_PLLCFGR_PLLM_3 | RCC_PLLCFGR_PLLM_4
-//  uint16_t PLLN_val = 0b110110000; // RCC_PLLCFGR_PLLN_4 | RCC_PLLCFGR_PLLN_5 | RCC_PLLCFGR_PLLN_7 | RCC_PLLCFGR_PLLN_8
-//  uint32_t PLLSRC_bit_offset = 22;
-//
-//  uint32_t* RCC_PLLCFGR_addy = (uint32_t*)(RCC_base_addy + RCC_PLLCFGR_offset);
-//  //*RCC_PLLCFGR_addy &=PLLM_val ~(); // Eh, I probably don't need to reset these back to zero, so I'm leaving this line incomplete
-//  *RCC_PLLCFGR_addy |= (PLLM_val << PLLM_bit_offset);
-//  *RCC_PLLCFGR_addy |= (PLLN_val << PLLN_bit_offset);
-//  *RCC_PLLCFGR_addy |= (1 << PLLSRC_bit_offset);
-//
-//  // Enable the PLL then wait for the corresponding ready bit to flip to 1
-//  uint32_t PLLON_bit_offset = 24;
-//  uint32_t PLLRDY_bit_offset = 25;
-//
-//  *RCC_CR_addy |= (1 << PLLON_bit_offset);
-//  while (!(*RCC_CR_addy & (1 << PLLRDY_bit_offset)));
-//
-//  // Assign the output of the PLL as the system frequency (and wait for the corresponding bit to flip to 1)
-//  uint32_t RCC_CFGR_offset = 0x08;
-//  uint32_t RCC_CFGR_SW_bit_offset = 0x0;
-//  uint32_t RCC_CFGR_SW_PLL_val = 0x2;
-//
-//  uint32_t* RCC_CFGR_addy = (uint32_t*)(RCC_base_addy + RCC_CFGR_offset);
-//  *RCC_CFGR_addy |= (RCC_CFGR_SW_PLL_val << RCC_CFGR_SW_bit_offset);
-//  while((*RCC_CFGR_addy & (3 << 2)) != (2 << 2)) {} // Admittedly could look more into these stands for RCC_CFGR_SWS and RCC_CFGR_SWS_1
-//
-//  // Setting Pixel Clock of ~9 MHz per the display RM (Display frequency nominal is 9)
-//  uint32_t PLLSAICFGR_offset = 0x88;
-//  uint32_t PLLSAIN_bit_offset = 6;
-//  uint32_t PLLSAIN_val = 0x11000000;
-//  uint32_t PLLSAIR_bit_offset = 28;
-//  uint32_t PLLSAIR_val = 0x101;
-//  uint32_t DCKCFGR1_offset = 0x8c;
-//  uint32_t PLLSAIDIVR_0_bit_offset = 16;
-//  uint32_t PLLSAIDIVR_1_bit_offset = 17;
-//
-//  uint32_t* RCC_PLLSAICFGR_addy = (uint32_t*)(RCC_base_addy + PLLSAICFGR_offset);
-//  *RCC_PLLSAICFGR_addy |= (PLLSAIN_val << PLLSAIN_bit_offset);
-//  *RCC_PLLSAICFGR_addy |= (PLLSAIR_val << PLLSAIR_bit_offset);
-//  uint32_t* RCC_DCKCFGR1_addy = (uint32_t*)(RCC_base_addy + DCKCFGR1_offset);
-//  *RCC_DCKCFGR1_addy |= (1 << PLLSAIDIVR_0_bit_offset);
-//  *RCC_DCKCFGR1_addy &= ~(1 << PLLSAIDIVR_1_bit_offset);
-//
-//  // Enable PLLSAI and wait for the corresponding ready bit to flip
-//  uint32_t PLLSAION_bit_offset = 28;
-//  uint32_t PLLSAIRDY_bit_offset = 29;
-//
-//  *RCC_CR_addy |= (1 << PLLSAION_bit_offset);
-//  while (!(*RCC_CR_addy & (1 << PLLSAIRDY_bit_offset)));
-//
-//  // Turn on the RCC for all of the GPIOs (maybe not needed)
-//  uint32_t RCC_AHB1ENR_offset = 0x30;
-//  uint32_t AllGPIO_on_val = 0b11111111111;
-//
-//  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
-//  *RCC_AHB1ENR_addy |= AllGPIO_on_val;
-//
-//
-//
-//  // CONFIGURE THE GPIO OUTPUTS
-//  // Set all relevant GPIO pins to AF
-//  // -- LCB_BL_CTL --> PK3
-//
-//  // -- LCD_CLK --> PI14
-//
-//  // -- LCD_HSYNC --> PI10
-//
-//  // -- LCD_VSYNC --> PI9
-//
-//  // -- LCD_DE --> PK7
-//
-//  // -- LCD_DISP --> PI12
-//
-//  // -- LCD_BL_A -- No GPIO input
-//
-//  // -- LCD_BL_K -- No GPIO input
-//
-//  // -- LCD_INT --> PI13
-//
-//  // -- LCD_SCL --> PH7
-//
-//  // -- LCD_SDA --> PH8
-//
-//  // -- LCD_RST --> NRST????
-//
-//
-//
-//  // -- LCD_R0 --> PI15
-//
-//  // -- LCD_R1 --> PJ0
-//  uint32_t GPIOJ_base_addy = 0x40022400;
-//  uint32_t GPIOx_MODER_offset = 0;
-//  uint8_t  pin0_bit_start = 0;
-//  uint8_t  AF_val = 0b10;
-//
-//  uint32_t* GPIOJ_MODER_addy = (uint32_t*)(GPIOJ_base_addy + GPIOx_MODER_offset);
-//  *GPIOJ_MODER_addy |= (AF_val << pin0_bit_start);
-//
-//  // -- LCD_R2 --> PJ1
-//
-//  // -- LCD_R3 --> PJ2
-//
-//  // -- LCD_R4 --> PJ3
-//
-//  // -- LCD_R5 --> PJ4
-//
-//  // -- LCD_R6 --> PJ5
-//
-//  // -- LCD_R7 --> PJ6
-//
-//
-//
-//  // -- LCD_G0 --> PJ7
-//
-//  // -- LCD_G1 --> PJ8
-//
-//  // -- LCD_G2 --> PJ9
-//
-//  // -- LCD_G3 --> PJ10
-//
-//  // -- LCD_G4 --> PJ11
-//
-//  // -- LCD_G5 --> PK0
-//
-//  // -- LCD_G6 --> PK1
-//
-//  // -- LCD_G7 --> PK2
-//
-//
-//
-//  // -- LCD_B0 --> PE4
-//
-//  // -- LCD_B1 --> PJ13
-//
-//  // -- LCD_B2 --> PJ14
-//
-//  // -- LCD_B3 --> PJ15
-//
-//  // -- LCD_B4 --> PG12
-//
-//  // -- LCD_B5 --> PK4
-//
-//  // -- LCD_B6 --> PK5
-//
-//  // -- LCD_B7 --> PK6
-//
-//  // Set all AFs to the right LCD function
-//
-//
-//  // Set all of these GPIO pins to a fast frequency (TBD)
-//
-//
-//  //END: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
+  //START: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
+  /*
+   * RM gives the following Programming Instructions
+   * - Enable the LTDC clock in the RCC register.
+   * - Configure the required pixel clock following the panel datasheet.
+   * - Configure the synchronous timings: VSYNC, HSYNC, vertical and horizontal back
+   *   porch, active data area and the front porch timings following the panel datasheet as
+   *   described in the Section 18.4.1: LTDC global configuration parameters.
+   *   • Configure the synchronous signals and clock polarity in the LTDC_GCR register.
+   *   • If needed, configure the background color in the LTDC_BCCR register.
+   *   • Configure the needed interrupts in the LTDC_IER and LTDC_LIPCR register.
+   *   • Configure the layer1/2 parameters by:
+   *   – programming the layer window horizontal and vertical position in the
+   *   LTDC_LxWHPCR and LTDC_WVPCR registers. The layer window must be in the
+   *   active data area.
+   *   – programming the pixel input format in the LTDC_LxPFCR register
+   *   – programming the color frame buffer start address in the LTDC_LxCFBAR register
+   *   – programming the line length and pitch of the color frame buffer in the
+   *   LTDC_LxCFBLR register
+   *   – programming the number of lines of the color frame buffer in the
+   *   LTDC_LxCFBLNR register
+   *   – if needed, loading the CLUT with the RGB values and its address in the
+   *   LTDC_LxCLUTWR register
+   *   – If needed, configuring the default color and the blending factors respectively in the
+   *   LTDC_LxDCCR and LTDC_LxBFCR registers
+   *   • Enable layer1/2 and if needed the CLUT in the LTDC_LxCR register.
+   *   • If needed, enable dithering and color keying respectively in the LTDC_GCR and
+   *   LTDC_LxCKCR registers. They can be also enabled on the fly.
+   *   • Reload the shadow registers to active register through the LTDC_SRCR register.
+   *   • Enable the LCD-TFT controller in the LTDC_GCR register.
+   *   • All layer parameters can be modified on the fly except the CLUT. The new configuration
+   *   has to be either reloaded immediately or during vertical blanking period by configuring
+   *   the LTDC_SRCR register.
+   *
+   *   Overkill, I'm using this to help walk me through it: https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
+   *
+   */
+
+  // Enable the RCC Clock for the LTDC peripheral
+  uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_APB2ENR_offset = 0x44;
+  uint8_t LTDCEN_reg = 26;
+
+  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB2ENR
+  *RCC_APB2ENR_addy |= (1 << LTDCEN_reg); // set the value of that addy to |= (1 << reg#)
+
+  // Turn the clock up to max speed
+  // uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_CR_offset = 0x0;
+  uint8_t HSEON_reg = 16;
+
+  uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
+  *RCC_CR_addy |= (1 << HSEON_reg); // set the value of that addy to |= (1 << reg#)
+
+  // Wait until the HSE oscillator (that we just enabled) is ready
+  // uint32_t RCC_base_addy = 0x40023800;
+  // uint32_t RCC_CR_offset = 0x0;
+  uint8_t HSERDY_reg = 17;
+
+  //uint32_t* RCC_CR_addy = (uint32_t*)(RCC_base_addy + RCC_CR_offset); // Set this var to the memory address of RCC_CR
+  while (!(*RCC_CR_addy & (1 << HSERDY_reg))); // when the HSERDY reg in RCC_RC is flips from 0 to 1, then we can finally move on
+
+  // Set the delay for the flash memory (??)
+  uint32_t Flash_base_addy = 0x40023C00;
+  uint32_t FLash_ACR_offset = 0x00;
+  uint8_t Flash_ACR_Latency_reg = 0;
+  uint8_t Latency_WaitState5 = 5;
+
+  uint32_t* Flash_ACR_addy = (uint32_t*)(Flash_base_addy + FLash_ACR_offset);
+  *Flash_ACR_addy &= ~(0xF << Flash_ACR_Latency_reg); // Revisit if needed. I'm trtying to clear the 0-3 bits to zero
+  *Flash_ACR_addy |= (Latency_WaitState5 << Flash_ACR_Latency_reg);
+
+  //Set the desired RCC frequency with the programmable dividers
+  // uint32_t RCC_base_addy = 0x40023800;
+  uint32_t RCC_PLLCFGR_offset = 0x4;
+  uint32_t PLLM_bit_offset = 0;
+  uint32_t PLLN_bit_offset = 5;
+  uint8_t PLLM_val = 0b11001; // RCC_PLLCFGR_PLLM_0 | RCC_PLLCFGR_PLLM_3 | RCC_PLLCFGR_PLLM_4
+  uint16_t PLLN_val = 0b110110000; // RCC_PLLCFGR_PLLN_4 | RCC_PLLCFGR_PLLN_5 | RCC_PLLCFGR_PLLN_7 | RCC_PLLCFGR_PLLN_8
+  uint32_t PLLSRC_bit_offset = 22;
+
+  uint32_t* RCC_PLLCFGR_addy = (uint32_t*)(RCC_base_addy + RCC_PLLCFGR_offset);
+  //*RCC_PLLCFGR_addy &=PLLM_val ~(); // Eh, I probably don't need to reset these back to zero, so I'm leaving this line incomplete
+  *RCC_PLLCFGR_addy |= (PLLM_val << PLLM_bit_offset);
+  *RCC_PLLCFGR_addy |= (PLLN_val << PLLN_bit_offset);
+  *RCC_PLLCFGR_addy |= (1 << PLLSRC_bit_offset);
+
+  // Enable the PLL then wait for the corresponding ready bit to flip to 1
+  uint32_t PLLON_bit_offset = 24;
+  uint32_t PLLRDY_bit_offset = 25;
+
+  *RCC_CR_addy |= (1 << PLLON_bit_offset);
+  while (!(*RCC_CR_addy & (1 << PLLRDY_bit_offset)));
+
+  // Assign the output of the PLL as the system frequency (and wait for the corresponding bit to flip to 1)
+  uint32_t RCC_CFGR_offset = 0x08;
+  uint32_t RCC_CFGR_SW_bit_offset = 0x0;
+  uint32_t RCC_CFGR_SW_PLL_val = 0x2;
+
+  uint32_t* RCC_CFGR_addy = (uint32_t*)(RCC_base_addy + RCC_CFGR_offset);
+  *RCC_CFGR_addy |= (RCC_CFGR_SW_PLL_val << RCC_CFGR_SW_bit_offset);
+  while((*RCC_CFGR_addy & (3 << 2)) != (2 << 2)) {} // Admittedly could look more into these stands for RCC_CFGR_SWS and RCC_CFGR_SWS_1
+
+  // Setting Pixel Clock of ~9 MHz per the display RM (Display frequency nominal is 9)
+  uint32_t PLLSAICFGR_offset = 0x88;
+  uint32_t PLLSAIN_bit_offset = 6;
+  uint32_t PLLSAIN_val = 0x11000000;
+  uint32_t PLLSAIR_bit_offset = 28;
+  uint32_t PLLSAIR_val = 0x101;
+  uint32_t DCKCFGR1_offset = 0x8c;
+  uint32_t PLLSAIDIVR_0_bit_offset = 16;
+  uint32_t PLLSAIDIVR_1_bit_offset = 17;
+
+  uint32_t* RCC_PLLSAICFGR_addy = (uint32_t*)(RCC_base_addy + PLLSAICFGR_offset);
+  *RCC_PLLSAICFGR_addy |= (PLLSAIN_val << PLLSAIN_bit_offset);
+  *RCC_PLLSAICFGR_addy |= (PLLSAIR_val << PLLSAIR_bit_offset);
+  uint32_t* RCC_DCKCFGR1_addy = (uint32_t*)(RCC_base_addy + DCKCFGR1_offset);
+  *RCC_DCKCFGR1_addy |= (1 << PLLSAIDIVR_0_bit_offset);
+  *RCC_DCKCFGR1_addy &= ~(1 << PLLSAIDIVR_1_bit_offset);
+
+  // Enable PLLSAI and wait for the corresponding ready bit to flip
+  uint32_t PLLSAION_bit_offset = 28;
+  uint32_t PLLSAIRDY_bit_offset = 29;
+
+  *RCC_CR_addy |= (1 << PLLSAION_bit_offset);
+  while (!(*RCC_CR_addy & (1 << PLLSAIRDY_bit_offset)));
+
+  // Turn on the RCC for all of the GPIOs (maybe not needed)
+  uint32_t RCC_AHB1ENR_offset = 0x30;
+  uint32_t AllGPIO_on_val = 0b11111111111;
+
+  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
+  *RCC_AHB1ENR_addy |= AllGPIO_on_val;
+
+
+
+
+  // CONFIGURE THE GPIO OUTPUTS. Then // Set all of these GPIO pins to a fast frequency (TBD). Then // Set all AFs to the right LCD function
+  // Set all relevant GPIO pins to AF
+  // Start with constants
+  uint8_t  AF_CLEAR = 0b11;
+  uint8_t  AF_val = 0b10;
+  uint32_t GPIOx_MODER_offset = 0x0;
+  uint32_t* GPIOx_MODER_addy;
+
+  uint8_t  SPEED_CLEAR = 0b11;
+  uint8_t  very_high_speed = 0b11; // Might need to be 0b10 like via GPIO_OSPEEDER_OSPEEDR4_1 in https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
+  uint32_t GPIOx_OSPEEDR_offset = 0x8;
+  uint32_t* GPIOx_OSPEEDR_addy;
+
+  uint8_t  AFP_CLEAR = 0b1111;
+  uint8_t  AF14 = 0b1110;
+  uint32_t GPIOx_AFRL_offset = 0x20; // 20 for bit 0-7 (AFRL) and 24 for bit 8-15 (AFRH)
+  uint32_t GPIOx_AFRH_offset = 0x24; // 20 for bit 0-7 (AFRL) and 24 for bit 8-15 (AFRH)
+  uint32_t GPIOx_AFRx_offset;
+  uint32_t* GPIOx_AFRx_addy;
+
+  uint32_t GPIOx_base_addy;
+  uint8_t  pin0_bit_start;
+
+
+  // -- LCB_BL_CTL --> PK3
+    GPIOx_base_addy = 0x40022800;
+    pin0_bit_start = 3;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_CLK --> PI14
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 14;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+
+  // -- LCD_HSYNC --> PI10
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 10;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_VSYNC --> PI9
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 9;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_DE --> PK7
+    GPIOx_base_addy = 0x40022800;
+    pin0_bit_start = 7;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_DISP --> PI12
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 12;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_BL_A -- No GPIO input. This doc makes me think there's no GPIO code needed here: https://www.st.com/resource/en/application_note/an4861-lcdtft-display-controller-ltdc-on-stm32-mcus-stmicroelectronics.pdf
+//    uint32_t GPIOx_base_addy = ;
+//    uint32_t GPIOx_MODER_offset = 0;
+//    uint8_t  pin0_bit_start = 3*2;
+//    uint8_t  AF_val = 0b10;
+//
+//    uint32_t* GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+//    *GPIOx_MODER_addy &= ~AF_CLEAR;
+//    *GPIOx_MODER_addy |= (AF_val << pin0_bit_start);
+
+  // -- LCD_BL_K -- No GPIO input. This doc makes me think there's no GPIO code needed here: https://www.st.com/resource/en/application_note/an4861-lcdtft-display-controller-ltdc-on-stm32-mcus-stmicroelectronics.pdf
+//    uint32_t GPIOx_base_addy = ;
+//    uint32_t GPIOx_MODER_offset = 0;
+//    uint8_t  pin0_bit_start = 3*2;
+//    uint8_t  AF_val = 0b10;
+//
+//    uint32_t* GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+//    *GPIOx_MODER_addy &= ~AF_CLEAR;
+//    *GPIOx_MODER_addy |= (AF_val << pin0_bit_start);
+
+  // -- LCD_INT --> PI13
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 13;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_SCL --> PH7
+    GPIOx_base_addy = 0x40021C00;
+    pin0_bit_start = 7;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_SDA --> PH8
+    GPIOx_base_addy = 0x40021C00;
+    pin0_bit_start = 8;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_RST --> NRST???? Looks like this net is hard-coded to an NRST pin on the STM32 chip, so no GPIO code needed
+//    uint32_t GPIOx_base_addy = ;
+//    uint32_t GPIOx_MODER_offset = 0;
+//    uint8_t  pin0_bit_start = 3*2;
+//    uint8_t  AF_val = 0b10;
+//
+//    uint32_t* GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+//    *GPIOx_MODER_addy &= ~AF_CLEAR;
+//    *GPIOx_MODER_addy |= (AF_val << pin0_bit_start);
+
+
+
+  // -- LCD_R0 --> PI15
+    GPIOx_base_addy = 0x40022000;
+    pin0_bit_start = 15;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R1 --> PJ0
+  GPIOx_base_addy = 0x40022400;
+    pin0_bit_start = 0;
+
+    GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+    *GPIOx_MODER_addy &= ~AF_CLEAR;
+    *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+    GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+    *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+    *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R2 --> PJ1
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 1;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R3 --> PJ2
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 2;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R4 --> PJ3
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 3;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R5 --> PJ4
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 4;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R6 --> PJ5
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 5;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_R7 --> PJ6
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 6;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+
+
+  // -- LCD_G0 --> PJ7
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 7;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G1 --> PJ8
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 8;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G2 --> PJ9
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 9;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G3 --> PJ10
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 10;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G4 --> PJ11
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 11;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G5 --> PK0
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 0;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G6 --> PK1
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 1;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_G7 --> PK2
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 2;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+
+
+  // -- LCD_B0 --> PE4
+  GPIOx_base_addy = 0x40021000;
+  pin0_bit_start = 4;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B1 --> PJ13
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 13;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B2 --> PJ14
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 14;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B3 --> PJ15
+  GPIOx_base_addy = 0x40022400;
+  pin0_bit_start = 15;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B4 --> PG12
+  GPIOx_base_addy = 0x40021800;
+  pin0_bit_start = 12;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B5 --> PK4
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 4;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B6 --> PK5
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 5;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+  // -- LCD_B7 --> PK6
+  GPIOx_base_addy = 0x40022800;
+  pin0_bit_start = 6;
+
+  GPIOx_MODER_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_MODER_offset);
+  *GPIOx_MODER_addy &= ~AF_CLEAR;
+  *GPIOx_MODER_addy |= (AF_val << 2*pin0_bit_start);
+
+  GPIOx_OSPEEDR_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_OSPEEDR_offset);
+  *GPIOx_OSPEEDR_addy &= ~SPEED_CLEAR;
+  *GPIOx_OSPEEDR_addy |= (very_high_speed << 2*pin0_bit_start);
+
+	pin0_bit_start = 3*4; // ([0-7] * 4) or (([8-15]-8) * 4)
+	if (pin0_bit_start < 8) {GPIOx_AFRx_offset = GPIOx_AFRL_offset;} else {GPIOx_AFRx_offset = GPIOx_AFRH_offset;}
+	GPIOx_AFRx_addy = (uint32_t*)(GPIOx_base_addy + GPIOx_AFRx_offset);
+	*GPIOx_AFRx_addy &= ~AFP_CLEAR;
+	*GPIOx_AFRx_addy |= (AF14 << 4*(pin0_bit_start % 8));
+
+
+
+  //END: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
 
   //UART8 IMPLEMENTATION -------------------------------------------------
   __disable_irq();
@@ -784,18 +1349,18 @@ int main(void)
    * Started off following: https://hackaday.com/2021/01/08/bare-metal-stm32-universal-asynchronous-communication-with-uarts/
    */
   // UART6 gets clock: RCC_APB2ENR (0x44 offset) --> USART6EN (reg 5) set to 1, enabled, per RM
-  uint32_t RCC_base_addy = 0x40023800; // defined earlier now!
-  uint32_t RCC_APB2ENR_offset = 0x44; // defined earlier now!
+//  uint32_t RCC_base_addy = 0x40023800; // defined earlier now!
+//  uint32_t RCC_APB2ENR_offset = 0x44; // defined earlier now!
   uint8_t USART6EN_reg = 5;
 
-  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB1LPENR // defined earlier now!
+//  uint32_t* RCC_APB2ENR_addy = (uint32_t*)(RCC_base_addy + RCC_APB2ENR_offset); // Set this var to the memory address of RCC_APB1LPENR // defined earlier now!
   *RCC_APB2ENR_addy |= (1 << USART6EN_reg); // set the value of that addy to |= (1 << reg#)
 
   // Enable the clock for the GPIO pins we'll be using (PC6 and PC7, so all of GPIO C)
-  uint32_t RCC_AHB1ENR_offset = 0x30;
+//  uint32_t RCC_AHB1ENR_offset = 0x30; // defined earlier now!
   uint8_t GPIOCEN_bit = 2;
 
-  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR
+//  uint32_t* RCC_AHB1ENR_addy = (uint32_t*)(RCC_base_addy + RCC_AHB1ENR_offset); // Set this var to the memory address of RCC_AHB1ENR // defined earlier now!
   *RCC_AHB1ENR_addy |= (1 << GPIOCEN_bit); // set the value of that addy to |= (1 << bit#)
 
   // Set the PC6 and PC7 "modes" to Alternate Function
@@ -826,7 +1391,7 @@ int main(void)
 
   // Which STM32 pins will transport the Tx and Rx signals? Ans: Tx on PC6, Rx on PC7 --> AF8 for PC6 and PC7.
   //uint32_t GPIOC_base_addy = 0x40020800;
-  uint32_t GPIOx_AFRL_offset = 0x20;
+//  uint32_t GPIOx_AFRL_offset = 0x20; // defined earlier now!
   uint8_t AFR_Tx = 6; // If >7, then must switch to AFRH offset and adjusted logic
   uint8_t AFR_Rx = 7; // If >7, then must switch to AFRH offset and adjusted logic
   uint8_t AF_OfInterest = 8;
@@ -1022,8 +1587,6 @@ int main(void)
 		uint8_t fullMessage2[8] = {0xFE,0x06,0x00,0x1F,0x00,0x00,0xAC,0x03};
 
 		__disable_irq();
-
-		int hold = 0;
 
 		for (int aa = 0; aa < 8; aa++) {
 			*USART6_TDR_addy = fullMessage[aa];
