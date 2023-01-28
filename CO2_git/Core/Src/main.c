@@ -1446,6 +1446,7 @@ int main(void)
   //uint32_t USART6_base_addy = 0x40011400;
   uint8_t USART_BRR_offset = 0x0C;
   uint32_t baud_rate = 9600;
+  SystemCoreClockUpdate(); // needed to update "SystemCoreClock" now that I've tweaked the RCC speed
   uint16_t uart_div = SystemCoreClock / baud_rate;
   uint8_t reg_offset = 4;
   uint32_t USART_BRR_val = (((uart_div / (1 << reg_offset)) << reg_offset) | ((uart_div % (1 << reg_offset)) << 0));

@@ -5,6 +5,9 @@ What if a handheld sensor and computer could read CO2 levels?
 
 CAPTAIN'S LOG -------------------------------------------------
 
+NEW DATE :: 2023.01.28 PM1 ----------
+  Summary: Problem = UART to (and from) the CO2 sensor is communicating at the wrong baud rate. Oscope shows it's much faster than the 9600 needed. I expected this because setting up the LTDC required changing the system clock to be much faster. How much faster? I scaled by UART speed setting until the speed roughly lined up on my oscope. I needed to slow down 6-7x. My UART code was setting its speed dynamically based on SystemCoreClock. But SystemCoreClock wasn't changing from before LTDC clock changes to after. I searched online and found https://electronics.stackexchange.com/questions/205875/setting-stm32f4-systemcoreclock-to-100-mhz-but-cant-get-it-only-get-57-6-mhz. Seemingly the operative similarity was calling SystemCoreClockUpdate();. So I did that before my UART code called SystemCoreClock. Bam it worked! So now the LTDC is partially setup and the CO2 sensor calls still work.
+
 NEW DATE :: 2023.01.26 PM1 ----------
   Summary: LTDC code uncommented. Added setup of all LTDC pins to AF, high speed, and the correct AF mode. Untested additions.
 
