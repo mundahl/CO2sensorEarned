@@ -45,6 +45,20 @@ void JHM_TxPinWrite(uint32_t* GPIO_Port_OI_Addy, uint32_t PinWithinPort, uint8_t
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
+// START: LTDC JHM Defines ------------------------------------------------
+// These don't feel like accurate values per https://mikrocontroller.bplaced.net/wordpress/wp-content/uploads/2018/01/RK043FN48H-CT672B-V1.0.pdf
+// But I got them from the following which uses the same datasheet: https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
+#define  DISPLAY_HSYNC            ((uint16_t)30)
+#define  DISPLAY_HBP              ((uint16_t)13)
+#define  DISPLAY_HFP              ((uint16_t)32)
+#define  DISPLAY_VSYNC            ((uint16_t)10)
+#define  DISPLAY_VBP              ((uint16_t)2)
+#define  DISPLAY_VFP              ((uint16_t)2)
+#define  DISPLAY_WIDTH 			((uint16_t)480)
+#define  DISPLAY_HEIGHT			((uint16_t)272)
+#define  PIXEL_SIZE               ((uint16_t)3)
+// END: LTDC JHM Defines ------------------------------------------------
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -474,8 +488,6 @@ int main(void)
   *SCB_SHPR10_OI = 240UL; // Empirically 240 (same)
 
 
-  __enable_irq();
-
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -584,6 +596,7 @@ int main(void)
    *   Overkill, I'm using this to help walk me through it: https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
    *
    */
+
 
   // Enable the RCC Clock for the LTDC peripheral
   uint32_t RCC_base_addy = 0x40023800;
@@ -1341,6 +1354,96 @@ int main(void)
 
 
 
+  // Setting up timings (non-layer-specific)
+	/*
+	*************************** Timings for TFT display**********************************
+	*
+	* HSW = (DISPLAY_HSYNC - 1)
+	* VSH = (DISPLAY_VSYNC - 1)
+	* AHBP = (DISPLAY_HSYNC + DISPLAY_HBP - 1)
+	* AVBP = (DISPLAY_VSYNC + DISPLAY_VBP - 1)
+	* AAW = (DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP - 1)
+	* AAH = (DISPLAY_WIDTH + DISPLAY_HSYNC + DISPLAY_HBP - 1)
+	* TOTALW = (DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP + DISPLAY_VFP - 1)
+	* TOTALH = (DISPLAY_WIDTH + DISPLAY_HSYNC + DISPLAY_HBP + DISPLAY_HFP - 1)
+	*
+	*/
+
+  // Set the LTDC synchronization size configuration register (LTDC_SSCR)
+  uint32_t LTDC_base_addy = 0x40016800;
+  uint32_t LTDC_SSRC_offset = 0x08;
+  uint32_t* LTDC_SSRC_addy = (uint32_t*)(LTDC_base_addy + LTDC_SSRC_offset);
+  *LTDC_SSRC_addy |= ((DISPLAY_HSYNC - 1) << 16 | (DISPLAY_VSYNC - 1));
+
+  // Set the LTDC back porch configuration register (LTDC_BPCR)
+  uint32_t LTDC_BPCR_offset = 0x0C;
+  uint32_t* LTDC_BPCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_BPCR_offset);
+  *LTDC_BPCR_addy |= ((DISPLAY_HSYNC+DISPLAY_HBP-1) << 16 | (DISPLAY_VSYNC+DISPLAY_VBP-1));
+
+  // Set the LTDC active width configuration register (LTDC_AWCR)
+  uint32_t LTDC_AWCR_offset = 0x10;
+  uint32_t* LTDC_AWCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_AWCR_offset);
+  *LTDC_AWCR_addy |= ((DISPLAY_WIDTH + DISPLAY_HSYNC + DISPLAY_HBP - 1) << 16 | (DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP - 1));
+
+  // Set the LTDC total width configuration register (LTDC_TWCR)
+  uint32_t LTDC_TWCR_offset = 0x14;
+  uint32_t* LTDC_TWCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_TWCR_offset);
+  *LTDC_TWCR_addy |= ((DISPLAY_WIDTH + DISPLAY_HSYNC + DISPLAY_HBP + DISPLAY_HFP -1)<< 16 |(DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP + DISPLAY_VFP - 1));
+
+  // Set the LTDC background color configuration register (LTDC_BCCR)
+  uint32_t LTDC_BCCR_offset = 0x0C;
+  uint32_t* LTDC_BCCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_BCCR_offset);
+  *LTDC_BCCR_addy = 0xFFFFFFFF;
+//  *LTDC_BCCR_addy = 0x0;
+
+  // Setting up timings (layer-specific)
+  // Set the LTDC layer *2* window horizontal position configuration register (LTDC_L2WHPCR)
+  uint32_t LTDC_L2WHPCR_offset = 0x8C + 0x80;
+  uint32_t* LTDC_L2WHPCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2WHPCR_offset);
+  *LTDC_L2WHPCR_addy |= (((DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP - 1) << 16) |(DISPLAY_VSYNC + DISPLAY_VBP));
+
+  // Set the LTDC layer *2* window vertical position configuration register (LTDC_L2WVPCR)
+  uint32_t LTDC_L2WVPCR_offset = 0x8C + 0x80;
+  uint32_t* LTDC_L2WVPCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2WVPCR_offset);
+  *LTDC_L2WVPCR_addy |= (((DISPLAY_HEIGHT + DISPLAY_VSYNC + DISPLAY_VBP - 1) << 16) |(DISPLAY_VSYNC + DISPLAY_VBP));
+
+  // Set the LTDC layer *2* pixel format configuration register (LTDC_L2PFCR)
+  uint32_t LTDC_L2PFCR_offset = 0x94 + 0x80;
+  uint32_t* LTDC_L2PFCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2PFCR_offset);
+  *LTDC_L2PFCR_addy = 0;
+
+  // Set the frame buffer values! LTDC layer *2* color frame buffer address register (LTDC_L2CFBAR)
+  const uint32_t imageLayer2[DISPLAY_WIDTH * DISPLAY_HEIGHT]; // Might need to remove this "const" per https://sudonull.com/post/15693-We-start-the-display-on-STM32-through-LTDC-on-registers
+  uint32_t LTDC_L2CFBAR_offset = 0xAC + 0x80;
+  uint32_t* LTDC_L2CFBAR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2CFBAR_offset);
+  *LTDC_L2CFBAR_addy = (uint32_t)imageLayer2;
+
+  // Set the layer two transparency via LTDC layer *2* constant alpha configuration register (LTDC_L2CACR)
+  uint32_t LTDC_L2CACR_offset = 0x98 + 0x80;
+  uint32_t* LTDC_L2CACR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2CACR_offset);
+  *LTDC_L2CACR_addy = 255;
+
+  // Set the L2 via LTDC layer x color frame buffer length register (LTDC_LxCFBLR)
+  uint32_t LTDC_L2CFBLR_offset = 0xB0 + 0x80;
+  uint32_t* LTDC_L2CFBLR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2CFBLR_offset);
+  *LTDC_L2CFBLR_addy |= (((PIXEL_SIZE * DISPLAY_WIDTH) << 16) | (PIXEL_SIZE * DISPLAY_WIDTH + 3)); // PIXEL SIZE = 3 bytes of data needed per pixel because RGB888 = 8+8+8 bits = 24 = 3 bytes
+
+  // Set the L2 via LTDC layer x color frame buffer line number register (LTDC_LxCFBLNR)
+  uint32_t LTDC_L2CFBLNR_offset = 0xB4 + 0x80;
+  uint32_t* LTDC_L2CFBLNR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2CFBLNR_offset);
+  *LTDC_L2CFBLNR_addy |= DISPLAY_HEIGHT;
+
+  // Set the L2 via LTDC layer x control register (LTDC_LxCR)
+  uint32_t LTDC_L2CR_offset = 0x84 + 0x80;
+  uint32_t* LTDC_L2CR_addy = (uint32_t*)(LTDC_base_addy + LTDC_L2CR_offset);
+  *LTDC_L2CR_addy |= 0x1;    // |= LTDC_LxCR_LEN;
+
+  // Set the LTDC global control register (LTDC_GCR)
+  uint32_t LTDC_GCR_offset = 0x18;
+  uint32_t* LTDC_GCR_addy = (uint32_t*)(LTDC_base_addy + LTDC_GCR_offset);
+  *LTDC_GCR_addy |= 0x1;    // |= LTDC_GCR_LTDCEN;
+
+  __enable_irq();
   //END: LTDC (LCD Controller) IMPLEMENTATION -------------------------------------------------
 
   //UART8 IMPLEMENTATION -------------------------------------------------
